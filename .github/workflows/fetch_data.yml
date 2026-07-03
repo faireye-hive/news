@@ -1,0 +1,34 @@
+name: Fetch Fallback Data & Generate Sitemap
+
+on:
+  schedule:
+    - cron: '0 0 * * *' # Todos os dias à meia-noite UTC
+  workflow_dispatch: # Permite acionamento manual
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Fetch Data and Generate Sitemap
+        run: |
+          node scripts/fetch_fallback_data.mjs
+          node scripts/generate_sitemap.mjs
+
+      - name: Commit and Push
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add public/fallback_discussions.json public/sitemap.xml
+          git commit -m "Update fallback data and sitemap" || echo "No changes to commit"
+          git push
