@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { HivePost, TribeInfo, ActiveVote } from '../types';
 import { X, Heart, HandCoins } from 'lucide-react';
 import { useCommunity } from '../contexts/CommunityContext';
@@ -87,8 +88,8 @@ export const VotersModal: React.FC<VotersModalProps> = ({ post, isOpen, onClose,
 
   if (!isOpen || !post) return null;
 
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
       <div 
         className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col max-h-[80vh] animate-fade-in"
         onClick={e => e.stopPropagation()}
@@ -107,7 +108,7 @@ export const VotersModal: React.FC<VotersModalProps> = ({ post, isOpen, onClose,
           {votersList.length === 0 ? (
             <div className="p-8 text-center text-slate-500">
                Nenhum voto positivo {community}.
-            </div>
+             </div>
           ) : (
             <ul className="space-y-1">
               {votersList.map(v => (
@@ -135,6 +136,7 @@ export const VotersModal: React.FC<VotersModalProps> = ({ post, isOpen, onClose,
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
