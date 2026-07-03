@@ -12,7 +12,7 @@ const translations = {
 type LanguageContextType = {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, any>) => string;
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(
@@ -23,7 +23,7 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const [language, setLanguageState] = useState<Language>(() => {
-    return (localStorage.getItem("language") as Language) || "pt";
+    return (localStorage.getItem("language") as Language) || "en";
   });
 
   const setLanguage = (lang: Language) => {
@@ -31,9 +31,10 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem("language", lang);
   };
 
-  const t = (key: string): string => {
+  const t = (key: string, params?: Record<string, any>): string => {
     const keys = key.split(".");
     let value: any = translations[language];
+
     for (const k of keys) {
       if (value && typeof value === "object") {
         value = value[k];
@@ -41,7 +42,18 @@ export const LanguageProvider: React.FC<{ children: React.ReactNode }> = ({
         return key; // Fallback
       }
     }
-    return typeof value === "string" ? value : key;
+
+    if (typeof value === "string") {
+      if (params) {
+        let result = value;
+        for (const [k, v] of Object.entries(params)) {
+          result = result.replace(new RegExp(`\\{\$\{k\}\\}`, 'g'), v);
+        }
+        return result;
+      }
+      return value;
+    }
+    return key;
   };
 
   return (

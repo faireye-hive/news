@@ -268,7 +268,7 @@ const MarketPools: React.FC = () => {
 
     const balanceAvailable = parseFloat(balances[swapFrom] || '0');
     if (amt > balanceAvailable) {
-      return alert(`Saldo insuficiente de ${swapFrom}. Você possui ${balanceAvailable}.`);
+      return alert(t('pools.insufficientBalanceExt', { token: swapFrom, balance: balanceAvailable }));
     }
 
     const minOut = parseFloat(estimatedOut) * (1 - slippage / 100);
@@ -300,7 +300,7 @@ const MarketPools: React.FC = () => {
     try {
       const res = await customJson('ssc-mainnet-hive', jsonPayload, `Swap de ${swapFrom} para ${swapTo}`, 'Active');
       if (res.success) {
-        alert("Transação enviada com sucesso! Atualizando saldos em alguns segundos...");
+        alert(t('pools.successSwap'));
         setSwapAmount('');
         setTimeout(refreshData, 3000);
         setTimeout(refreshData, 6000);
@@ -318,7 +318,7 @@ const MarketPools: React.FC = () => {
 
   // Perform Add Liquidity Action
   const handleAddLiquiditySubmit = async () => {
-    if (!user) return alert("Por favor, faça login para adicionar liquidez.");
+    if (!user) return alert(t('pools.loginToAdd'));
     if (!selectedPool) return;
 
     const amtA = parseFloat(addAmountA);
@@ -332,8 +332,8 @@ const MarketPools: React.FC = () => {
     const balA = parseFloat(balances[tokenA] || '0');
     const balB = parseFloat(balances[tokenB] || '0');
 
-    if (amtA > balA) return alert(`Saldo insuficiente de ${tokenA}.`);
-    if (amtB > balB) return alert(`Saldo insuficiente de ${tokenB}.`);
+    if (amtA > balA) return alert(t('pools.insufficientBalance', { token: tokenA }));
+    if (amtB > balB) return alert(t('pools.insufficientBalance', { token: tokenB }));
 
     const pA = getPrecision(tokenA, selectedPool);
     const pB = getPrecision(tokenB, selectedPool);
@@ -366,7 +366,7 @@ const MarketPools: React.FC = () => {
           fetchData();
         }, 4000);
       } else {
-        alert("Erro ao adicionar liquidez: " + res.msg);
+        alert(t('pools.errorAdd') + res.msg);
       }
     } catch (err: any) {
       console.error(err);
@@ -378,7 +378,7 @@ const MarketPools: React.FC = () => {
 
   // Perform Remove Liquidity Action
   const handleRemoveLiquiditySubmit = async () => {
-    if (!user) return alert("Por favor, faça login para remover liquidez.");
+    if (!user) return alert(t('pools.loginToRemove'));
     if (!selectedPool) return;
 
     const shareInfo = userShares.find(s => s.tokenPair === selectedPool.tokenPair);
@@ -410,7 +410,7 @@ const MarketPools: React.FC = () => {
           fetchData();
         }, 4000);
       } else {
-        alert("Erro ao remover liquidez: " + res.msg);
+        alert(t('pools.errorRemove') + res.msg);
       }
     } catch (err: any) {
       console.error(err);
@@ -514,8 +514,8 @@ const MarketPools: React.FC = () => {
 
                             {userShare && (
                               <div className="mt-1 pt-1 border-t border-slate-800/60 flex justify-between items-center text-[10px] text-cent font-medium">
-                                 <span>Sua fatia: {userShare.proportion}</span>
-                                 <span>Minha Liquidez</span>
+                                 <span>{t('pools.yourShareText')} {userShare.proportion}</span>
+                                 <span>{t('pools.myLiquidity')}</span>
                               </div>
                             )}
                          </button>
@@ -589,14 +589,14 @@ const MarketPools: React.FC = () => {
                                   <span>{t("pools.from")}</span>
                                   {user && (
                                      <div className="flex items-center gap-3">
-                                       <button onClick={refreshData} title="Atualizar Saldos" className="text-slate-500 hover:text-white transition-colors">
+                                       <button onClick={refreshData} title={t('pools.refreshBalances')} className="text-slate-500 hover:text-white transition-colors">
                                           <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
                                        </button>
                                        <button 
                                          onClick={() => setSwapAmount(balances[swapFrom] || '0')}
                                          className="hover:text-cent transition-colors"
                                        >
-                                          Saldo: <span className="font-mono">{parseFloat(balances[swapFrom] || '0').toFixed(4)}</span> (MAX)
+                                          {t('pools.balance')} <span className="font-mono">{parseFloat(balances[swapFrom] || '0').toFixed(4)}</span> (MAX)
                                        </button>
                                      </div>
                                   )}
@@ -649,11 +649,11 @@ const MarketPools: React.FC = () => {
                                   <span>{t("pools.to")}</span>
                                   {user && (
                                      <div className="flex items-center gap-3">
-                                       <button onClick={refreshData} title="Atualizar Saldos" className="text-slate-500 hover:text-white transition-colors">
+                                       <button onClick={refreshData} title={t('pools.refreshBalances')} className="text-slate-500 hover:text-white transition-colors">
                                           <RefreshCw size={12} className={loading ? "animate-spin" : ""} />
                                        </button>
                                        <span className="font-mono text-slate-500">
-                                          Saldo: {parseFloat(balances[swapTo] || '0').toFixed(4)}
+                                          {t('pools.balance')} {parseFloat(balances[swapTo] || '0').toFixed(4)}
                                        </span>
                                      </div>
                                   )}
@@ -671,7 +671,7 @@ const MarketPools: React.FC = () => {
                             {/* Slippage Settings */}
                             <div className="flex items-center justify-between text-xs text-slate-400 bg-slate-900/40 p-3 rounded-lg border border-slate-800">
                                <span className="flex items-center gap-1">
-                                  <Sliders size={13} /> Tolerância de Deslizamento
+                                  <Sliders size={13} /> {t('pools.slippage')}
                                </span>
                                <div className="flex items-center gap-1.5">
                                   {[0.5, 1.0, 2.0].map(s => (
@@ -719,11 +719,11 @@ const MarketPools: React.FC = () => {
                                {actionLoading ? <Loader2 size={18} className="animate-spin" /> : <ArrowLeftRight size={18} />}
                                {actionLoading ? t('pools.processingSwap') : 
                                  (!user ? t('pools.loginToSwap') : 
-                                  parseFloat(swapAmount) > parseFloat(balances[swapFrom] || '0') ? `${t("pools.insufficientBalance").replace("{token}", swapFrom)}` :
+                                  parseFloat(swapAmount) > parseFloat(balances[swapFrom] || '0') ? t('pools.insufficientBalance', { token: swapFrom }) :
                                   `${t("pools.executeSwap")} (${swapFrom} → ${swapTo})`)}
                             </button>
                             <p className="text-[10px] text-slate-500 text-center">
-                              *Operação realizada na Hive Engine via Keychain. Certifique-se de assinar com sua chave ativa.
+                              {t('pools.disclaimer')}
                             </p>
                          </div>
                       )}
@@ -734,7 +734,7 @@ const MarketPools: React.FC = () => {
                             <div className="bg-slate-900/40 p-4 border border-slate-800 rounded-xl flex gap-3 text-xs text-slate-400">
                                <Info size={18} className="text-cent shrink-0" />
                                <p>
-                                 Ao prover liquidez, você deve adicionar os dois ativos da pool na proporção correta de mercado. Em troca, você recebe tokens de participação (Shares) que representam sua parcela na pool e ganha taxas geradas por traders.
+                                 {t('pools.addLiquidityInfo')}
                                </p>
                             </div>
 
@@ -747,7 +747,7 @@ const MarketPools: React.FC = () => {
                                        onClick={() => handleAddAmountAChange(balances[selectedPool.tokenPair.split(':')[0]] || '0')}
                                        className="hover:text-cent transition-colors"
                                      >
-                                        Saldo: <span className="font-mono">{parseFloat(balances[selectedPool.tokenPair.split(':')[0]] || '0').toFixed(4)}</span> (MAX)
+                                        {t('pools.balance')} <span className="font-mono">{parseFloat(balances[selectedPool.tokenPair.split(':')[0]] || '0').toFixed(4)}</span> (MAX)
                                      </button>
                                   )}
                                </div>
@@ -782,7 +782,7 @@ const MarketPools: React.FC = () => {
                                        onClick={() => handleAddAmountBChange(balances[selectedPool.tokenPair.split(':')[1]] || '0')}
                                        className="hover:text-cent transition-colors"
                                      >
-                                        Saldo: <span className="font-mono">{parseFloat(balances[selectedPool.tokenPair.split(':')[1]] || '0').toFixed(4)}</span> (MAX)
+                                        {t('pools.balance')} <span className="font-mono">{parseFloat(balances[selectedPool.tokenPair.split(':')[1]] || '0').toFixed(4)}</span> (MAX)
                                      </button>
                                   )}
                                </div>
@@ -831,7 +831,7 @@ const MarketPools: React.FC = () => {
                                      <div className="bg-slate-900/40 p-12 text-center rounded-2xl border border-slate-800 flex flex-col items-center">
                                         <AlertCircle size={36} className="text-slate-500 mb-2" />
                                         <h4 className="text-white font-bold text-sm">{t("pools.noSharesTitle")}</h4>
-                                        <p className="text-xs text-slate-400 mt-1 max-w-sm">{t("pools.noSharesDesc").replace("{pair}", selectedPool.tokenPair)}</p>
+                                        <p className="text-xs text-slate-400 mt-1 max-w-sm">{t("pools.noSharesDesc", { pair: selectedPool.tokenPair })}</p>
                                      </div>
                                   );
                                }
@@ -911,7 +911,7 @@ const MarketPools: React.FC = () => {
                                        className="w-full py-4 bg-red-500 hover:bg-red-400 text-slate-900 font-bold text-base rounded-xl transition-all shadow-lg flex items-center justify-center gap-2"
                                      >
                                         {actionLoading ? <Loader2 size={18} className="animate-spin" /> : <Minus size={18} />}
-                                        {actionLoading ? 'Processando Retirada...' : `Remover ${removePercent}% de Liquidez`}
+                                        {actionLoading ? 'Processando Retirada...' : t('pools.removePercent', { percent: removePercent })}
                                      </button>
                                   </div>
                                );
@@ -924,13 +924,13 @@ const MarketPools: React.FC = () => {
                          <div className="space-y-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                <div className="bg-slate-900 p-4 border border-slate-800 rounded-xl space-y-1">
-                                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Reserva de {selectedPool.tokenPair.split(':')[0]}</span>
+                                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">{t('pools.reserveOf')} {selectedPool.tokenPair.split(':')[0]}</span>
                                   <div className="text-lg font-bold text-white font-mono">
                                      {parseFloat(selectedPool.baseQuantity).toLocaleString(undefined, {minimumFractionDigits: 4})}
                                   </div>
                                </div>
                                <div className="bg-slate-900 p-4 border border-slate-800 rounded-xl space-y-1">
-                                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">Reserva de {selectedPool.tokenPair.split(':')[1]}</span>
+                                  <span className="text-[10px] text-slate-500 uppercase tracking-wider font-mono">{t('pools.reserveOf')} {selectedPool.tokenPair.split(':')[1]}</span>
                                   <div className="text-lg font-bold text-white font-mono">
                                      {parseFloat(selectedPool.quoteQuantity).toLocaleString(undefined, {minimumFractionDigits: 4})}
                                   </div>
@@ -939,7 +939,7 @@ const MarketPools: React.FC = () => {
 
                             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
                                <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 border-b border-slate-800 pb-2.5">
-                                  <TrendingUp size={16} className="text-cent" /> Indicadores de Preço
+                                  <TrendingUp size={16} className="text-cent" /> {t('pools.priceIndicators')}
                                </h4>
                                <div className="grid grid-cols-2 gap-4 font-mono text-xs">
                                   <div className="space-y-1.5">
@@ -958,9 +958,9 @@ const MarketPools: React.FC = () => {
                             </div>
 
                             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-3 font-mono text-xs text-slate-400">
-                               <h4 className="text-sm font-semibold text-white font-sans mb-1">Informações Adicionais</h4>
+                               <h4 className="text-sm font-semibold text-white font-sans mb-1">{t('pools.additionalInfo')}</h4>
                                <div className="flex justify-between items-center py-1.5 border-b border-slate-800/60">
-                                  <span>Total de Quotas (Pool Shares)</span>
+                                  <span>{t('pools.totalSharesInfo')}</span>
                                   <span className="text-white font-bold">{parseFloat(selectedPool.totalShares).toLocaleString(undefined, {maximumFractionDigits: 4})}</span>
                                 </div>
                                <div className="flex justify-between items-center py-1.5 border-b border-slate-800/60">
@@ -975,7 +975,7 @@ const MarketPools: React.FC = () => {
 
                             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
                                <h4 className="text-sm font-semibold text-white flex items-center gap-1.5 border-b border-slate-800 pb-2.5">
-                                  <Users size={16} className="text-cent" /> Provedores de Liquidez
+                                  <Users size={16} className="text-cent" /> {t('pools.liquidityProviders')}
                                </h4>
                                {loadingHolders ? (
                                   <div className="flex justify-center py-6">
@@ -1011,7 +1011,7 @@ const MarketPools: React.FC = () => {
                                      )}
                                      {poolHolders.length > 0 && (
                                         <div className="text-center text-slate-500 py-3 text-[10px] border-t border-slate-800/60 mt-2">
-                                           Mostrando todos os {poolHolders.length} provedores desta pool.
+                                           {t('pools.showingAllProviders', { count: poolHolders.length })}
                                         </div>
                                      )}
                                   </div>
