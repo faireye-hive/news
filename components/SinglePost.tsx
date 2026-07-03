@@ -32,6 +32,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useCommunity } from "../contexts/CommunityContext";
 import { useHiddenUsers } from "../utils/hiddenUsers";
 import { useLanguage } from "../contexts/LanguageContext";
+import VoteModal from "./VoteModal";
 import { VotersModal } from "./VotersModal";
 
 // Helper component for individual comments
@@ -45,6 +46,7 @@ const CommentItem: React.FC<{
   const { community } = useCommunity();
   const { hiddenUsers, hideUser } = useHiddenUsers();
   const [isVoting, setIsVoting] = useState(false);
+  const [voteModalPost, setVoteModalPost] = useState<HivePost | null>(null);
   const [isReplying, setIsReplying] = useState(false);
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyText, setReplyText] = useState("");
@@ -133,7 +135,7 @@ const CommentItem: React.FC<{
     }
   };
 
-  const handleVote = async () => {
+  const handleVoteClick = () => {
     if (!user) {
       alert("Faça login para votar!");
       return;
@@ -145,30 +147,36 @@ const CommentItem: React.FC<{
       alert("Você já votou neste comentário.");
       return;
     }
+    setVoteModalPost(localComment);
+  };
 
+  const handleConfirmVote = async (weight: number) => {
+    if (!user) return;
     setIsVoting(true);
     try {
       const result = await vote(
         localComment.author,
         localComment.permlink,
-        10000,
+        weight,
       );
       if (result.success) {
         setLocalComment((prev) => ({
           ...prev,
-          net_votes: (prev.net_votes || 0) + 1,
           active_votes: [
             ...(prev.active_votes || []),
-            { voter: user, weight: 10000, percent: 10000, rshares: 0 },
+            { voter: user, weight: weight, rshares: 0, percent: weight },
           ],
         }));
       } else {
         alert("Erro ao votar: " + result.msg);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao votar no comentário.");
+    } finally {
+      setIsVoting(false);
+      setVoteModalPost(null);
     }
-    setIsVoting(false);
   };
 
   const handleReply = async () => {
@@ -182,7 +190,7 @@ const CommentItem: React.FC<{
         localComment.permlink,
         "",
         replyText,
-        ["cent"],
+        ["news"],
         declinePayout,
       );
       if (result.success) {
@@ -252,7 +260,7 @@ const CommentItem: React.FC<{
 
       <div className="flex items-center gap-6 mt-4 md:pl-11">
         <button
-          onClick={handleVote}
+          onClick={handleVoteClick}
           disabled={userHasVoted || isVoting}
           className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${userHasVoted ? "text-green-400" : "text-slate-500 hover:text-green-400"}`}
         >
@@ -314,6 +322,16 @@ const CommentItem: React.FC<{
           </div>
         </div>
       )}
+      {voteModalPost && (
+        <VoteModal
+          isOpen={true}
+          onClose={() => setVoteModalPost(null)}
+          post={voteModalPost}
+          username={user || ''}
+          token={community}
+          onVote={handleConfirmVote}
+        />
+      )}
     </div>
   );
 };
@@ -342,6 +360,7 @@ const SinglePost: React.FC = () => {
   const [loadingComments, setLoadingComments] = useState(false);
   const [htmlContent, setHtmlContent] = useState("");
   const [isVoting, setIsVoting] = useState(false);
+  const [voteModalPost, setVoteModalPost] = useState<HivePost | null>(null);
   const [showDebug, setShowDebug] = useState(false);
 
   // Settings State
@@ -596,7 +615,7 @@ const SinglePost: React.FC = () => {
     }
   };
 
-  const handleVote = async () => {
+  const handleVoteClick = () => {
     if (!user) {
       alert("Faça login para votar!");
       return;
@@ -609,32 +628,36 @@ const SinglePost: React.FC = () => {
       return;
     }
 
+    setVoteModalPost(post);
+  };
+
+  const handleConfirmVote = async (weight: number) => {
+    if (!user || !post) return;
     setIsVoting(true);
     try {
-      const result = await vote(post.author, post.permlink, 10000);
+      const result = await vote(post.author, post.permlink, weight);
       if (result.success) {
         setPost((prev) =>
           prev
             ? {
                 ...prev,
-                net_votes: prev.net_votes + 1,
                 active_votes: [
                   ...(prev.active_votes || []),
-                  { voter: user, weight: 10000, percent: 10000, rshares: 0 },
+                  { voter: user, weight: weight, rshares: 0, percent: weight },
                 ],
               }
             : null,
         );
-        alert(
-          "Voto computado! Atualize a página em alguns instantes para ver o novo valor.",
-        );
       } else {
         alert("Erro ao votar: " + result.msg);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao votar no post.");
+    } finally {
+      setIsVoting(false);
+      setVoteModalPost(null);
     }
-    setIsVoting(false);
   };
 
   const handleReply = async () => {
@@ -651,7 +674,7 @@ const SinglePost: React.FC = () => {
         post.permlink,
         "",
         replyText,
-        ["cent"],
+        ["news"],
         declinePayout,
       );
       if (result.success) {
@@ -915,7 +938,7 @@ const SinglePost: React.FC = () => {
                 }`}
               >
                 <button
-                  onClick={handleVote}
+                  onClick={handleVoteClick}
                   disabled={userHasVoted || isVoting}
                   className="group flex items-center hover:text-green-400 transition-colors"
                   title="Votar (100%)"
@@ -1229,6 +1252,16 @@ const SinglePost: React.FC = () => {
         onClose={() => setShowVotersModal(false)}
         tribeInfo={tribeInfo}
       />
+      {voteModalPost && (
+        <VoteModal
+          isOpen={true}
+          onClose={() => setVoteModalPost(null)}
+          post={voteModalPost}
+          username={user || ''}
+          token={community}
+          onVote={handleConfirmVote}
+        />
+      )}
     </div>
   );
 

@@ -42,13 +42,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (username: string) => {
     return new Promise<void>((resolve, reject) => {
       if (!window.hive_keychain) {
-        alert("Hive Keychain não está instalado!");
+        alert("Hive Keychain is not installed!");
         reject("Keychain missing");
         return;
       }
 
       const ts = Date.now();
-      const message = `Login to CENT Explorer: ${ts}`;
+      const message = `Login to News Explorer: ${ts}`;
 
       window.hive_keychain.requestSignBuffer(
         username,

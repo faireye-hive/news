@@ -597,3 +597,16 @@ export const getUserPoolShares = async (username: string, symbol: string = 'BYTE
     return [];
   }
 };
+export const getVotingPower = async (username: string, symbol: string = 'BYTE') => {
+  try {
+    const pools = await rpcCall<any>('comments', 'rewardPools', { symbol: symbol.toUpperCase() });
+    if (!pools || pools.length === 0) return null;
+    const poolId = pools[0]._id;
+    const vpData = await rpcCall<any>('comments', 'votingPower', { account: username, rewardPoolId: poolId });
+    if (!vpData || vpData.length === 0) return null;
+    return vpData[0];
+  } catch (error) {
+    console.error("Error fetching voting power:", error);
+    return null;
+  }
+};

@@ -573,7 +573,7 @@ const MarketPools: React.FC = () => {
                         onClick={() => setActiveTab('overview')}
                         className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-semibold rounded-lg transition-colors ${activeTab === 'overview' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:text-slate-200'}`}
                       >
-                         <Info size={16} /> Estatísticas
+                         <Info size={16} /> Statistics
                       </button>
                    </div>
 

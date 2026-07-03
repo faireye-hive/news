@@ -43,6 +43,7 @@ import { useCommunity } from "../contexts/CommunityContext";
 import { useLanguage } from "../contexts/LanguageContext";
 import { Link, useSearchParams, useLocation } from "react-router-dom";
 import { TOPICS } from "../constants";
+import VoteModal from "./VoteModal";
 import { VotersModal } from "./VotersModal";
 
 const getTopicIcon = (id: string, size = 16) => {
@@ -91,7 +92,8 @@ const Explorer: React.FC = () => {
     initialParentTag,
   );
   const [loadingMore, setLoadingMore] = useState(false);
-  const [votingPost, setVotingPost] = useState<string | null>(null); // permlink of post being voted on
+  const [votingPost, setVotingPost] = useState<string | null>(null);
+  const [voteModalPost, setVoteModalPost] = useState<HivePost | null>(null); // permlink of post being voted on
   const [votersModalPost, setVotersModalPost] = useState<HivePost | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">(() => {
     return (
@@ -234,52 +236,55 @@ const Explorer: React.FC = () => {
       window.removeEventListener("token-data-updated", handleByteUpdate);
   }, [sort, community, tag]);
 
-  const handleVote = async (post: HivePost) => {
+  const handleVoteClick = (post: HivePost) => {
     if (!user) {
       alert("Faça login para votar!");
       return;
     }
-
-    if (votingPost) return;
-
-    // Check if already voted
     const alreadyVoted = post.active_votes?.some((v) => v.voter === user);
     if (alreadyVoted) {
       alert("Você já votou neste post.");
       return;
     }
+    setVoteModalPost(post);
+  };
 
-    setVotingPost(post.permlink);
-
-    // Default 100% vote
-    const weight = 10000;
-
+  const handleConfirmVote = async (weight: number) => {
+    if (!voteModalPost || !user) return;
+    
+    setVotingPost(voteModalPost.permlink);
     try {
-      const result = await vote(post.author, post.permlink, weight);
+      const result = await vote(voteModalPost.author, voteModalPost.permlink, weight);
       if (result.success) {
-        // Optimistic UI Update
         setPosts((currentPosts) =>
           currentPosts.map((p) => {
-            if (p.permlink === post.permlink) {
+            if (p.author === voteModalPost.author && p.permlink === voteModalPost.permlink) {
+              const currentVotes = p.active_votes || [];
               return {
                 ...p,
-                net_votes: p.net_votes + 1,
                 active_votes: [
-                  ...(p.active_votes || []),
-                  { voter: user, weight, rshares: 0, percent: weight },
+                  ...currentVotes,
+                  {
+                    voter: user,
+                    weight,
+                    rshares: 0,
+                    percent: weight,
+                  },
                 ],
               };
             }
             return p;
-          }),
+          })
         );
       } else {
-        alert(`Erro ao votar: ${result.msg}`);
+        alert("Erro ao votar: " + result.msg);
       }
-    } catch (e) {
-      console.error(e);
+    } catch (error) {
+      console.error(error);
+      alert("Erro ao votar.");
     } finally {
       setVotingPost(null);
+      setVoteModalPost(null);
     }
   };
 
@@ -921,7 +926,7 @@ const Explorer: React.FC = () => {
                         <div className="flex gap-4 items-center">
                           <div className="flex items-center gap-1.5 transition-colors">
                             <button
-                              onClick={() => handleVote(post)}
+                              onClick={() => handleVoteClick(post)}
                               disabled={userHasVoted || isVotingThis}
                               className={`${
                                 userHasVoted
@@ -1025,6 +1030,14 @@ const Explorer: React.FC = () => {
         isOpen={votersModalPost !== null}
         onClose={() => setVotersModalPost(null)}
         tribeInfo={tribeInfo}
+      />
+      <VoteModal
+        isOpen={voteModalPost !== null}
+        onClose={() => setVoteModalPost(null)}
+        post={voteModalPost}
+        username={user || ''}
+        token={community}
+        onVote={handleConfirmVote}
       />
     </div>
   );

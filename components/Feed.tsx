@@ -9,6 +9,7 @@ import { useLanguage } from '../contexts/LanguageContext';
 import { Link, Navigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { extractImage } from '../utils/image';
+import VoteModal from './VoteModal';
 import { VotersModal } from './VotersModal';
 
 const Feed: React.FC = () => {
@@ -21,6 +22,7 @@ const Feed: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [votingPost, setVotingPost] = useState<string | null>(null);
+  const [voteModalPost, setVoteModalPost] = useState<HivePost | null>(null);
   const [votersModalPost, setVotersModalPost] = useState<HivePost | null>(null);
 
   useEffect(() => {
@@ -38,21 +40,31 @@ const Feed: React.FC = () => {
     loadHomeFeed();
   }, [user, community]);
 
-  const handleVote = async (post: HivePost) => {
+  const handleVoteClick = (post: HivePost) => {
     if (!user) {
       alert(t('feed.loginToVote'));
       return;
     }
+    const alreadyVoted = post.active_votes?.some((v) => v.voter === user);
+    if (alreadyVoted) {
+      alert(t('feed.error') + "Você já votou neste post.");
+      return;
+    }
+    setVoteModalPost(post);
+  };
+
+  const handleConfirmVote = async (weight: number) => {
+    if (!voteModalPost || !user) return;
     
-    setVotingPost(post.permlink);
+    setVotingPost(voteModalPost.permlink);
     try {
-      const result = await vote(post.author, post.permlink, 10000);
+      const result = await vote(voteModalPost.author, voteModalPost.permlink, weight);
       if (result.success) {
         setPosts(posts.map(p => {
-          if (p.author === post.author && p.permlink === post.permlink) {
+          if (p.author === voteModalPost.author && p.permlink === voteModalPost.permlink) {
             let active_votes = Array.isArray(p.active_votes) ? [...p.active_votes] : [];
             if (!active_votes.some((v: any) => v.voter === user)) {
-               active_votes.push({ voter: user, percent: 10000, rshares: 0 });
+               active_votes.push({ voter: user, percent: weight, rshares: 0, weight: weight });
             }
             return { ...p, active_votes };
           }
@@ -61,10 +73,13 @@ const Feed: React.FC = () => {
       } else {
         alert(t('feed.errorVote') + result.msg);
       }
-    } catch (e: any) {
-       alert(t('feed.error') + e.message);
+    } catch (error) {
+      console.error(error);
+      alert(t('feed.error'));
+    } finally {
+      setVotingPost(null);
+      setVoteModalPost(null);
     }
-    setVotingPost(null);
   };
 
   if (!user) {
@@ -152,7 +167,7 @@ const Feed: React.FC = () => {
                      <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800">
                            <button 
-                              onClick={() => handleVote(post)}
+                              onClick={() => handleVoteClick(post)}
                               disabled={votingPost === post.permlink}
                               className={`${upvoted ? 'text-cent' : 'text-slate-400 hover:text-white'} disabled:opacity-50`}
                            >
@@ -186,11 +201,19 @@ const Feed: React.FC = () => {
         </div>
       )}
       
-      <VotersModal 
-         post={votersModalPost} 
-         isOpen={votersModalPost !== null} 
-         onClose={() => setVotersModalPost(null)}
-         tribeInfo={tribeInfo}
+      <VotersModal
+        post={votersModalPost}
+        isOpen={votersModalPost !== null}
+        onClose={() => setVotersModalPost(null)}
+        tribeInfo={tribeInfo}
+      />
+      <VoteModal
+        isOpen={voteModalPost !== null}
+        onClose={() => setVoteModalPost(null)}
+        post={voteModalPost}
+        username={user || ''}
+        token={community}
+        onVote={handleConfirmVote}
       />
     </div>
   );

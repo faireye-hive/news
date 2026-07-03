@@ -70,7 +70,7 @@
     "estimatedPrice": "Preço Unitário Estimado",
     "processingSwap": "Processando Swap...",
     "loginToSwap": "Conecte-se para fazer Swap",
-    "insufficientBalance": "Saldo de {token} Insuficiente",
+    "insufficientBalance": "Saldo de NEWS Insuficiente",
     "executeSwap": "Executar Swap",
     "disclaimer": "*Operação realizada na Hive Engine via Keychain. Certifique-se de assinar com sua chave ativa.",
     "addLiquidityInfo": "Ao prover liquidez, você deve adicionar os dois ativos da pool na proporção correta de mercado. Em troca, você recebe tokens de participação (Shares) que representam sua parcela na pool e ganha taxas geradas por traders.",
@@ -94,7 +94,7 @@
     "errorAdd": "Erro ao adicionar liquidez: ",
     "loginToRemove": "Por favor, faça login para remover liquidez.",
     "errorRemove": "Erro ao remover liquidez: ",
-    "insufficientBalanceExt": "Saldo insuficiente de {token}. Você possui {balance}.",
+    "insufficientBalanceExt": "Saldo insuficiente de NEWS. Você possui {balance}.",
     "yourShareText": "Sua fatia: ",
     "myLiquidity": "Minha Liquidez",
     "reserveOf": "Reserva de",
@@ -245,5 +245,18 @@
     "rank": "Rank",
     "account": "Conta",
     "stakedTokens": "Tokens em Stake"
+  },
+  "voteModal": {
+    "title": "Votar",
+    "upvote": "Upvote (Votar a favor)",
+    "downvote": "Downvote (Votar contra)",
+    "weight": "Peso",
+    "votingPower": "Poder de Voto de NEWS",
+    "upvotePower": "Poder de Upvote",
+    "downvotePower": "Poder de Downvote",
+    "loading": "Carregando...",
+    "notFound": "Dados de poder de voto não encontrados.",
+    "confirmUpvote": "Confirmar Upvote",
+    "confirmDownvote": "Confirmar Downvote"
   }
 }
