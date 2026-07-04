@@ -610,3 +610,79 @@ export const getVotingPower = async (username: string, symbol: string = 'BYTE') 
     return null;
   }
 };
+
+export const getAdminCuratedPosts = async (adminAccount: string = 'faireye'): Promise<any> => {
+  try {
+    const url = `https://api.hive.blog/hafah-api/accounts/${adminAccount}/operations?transacting-account-name=${adminAccount}&participation-mode=include&operation-types=18&page-size=100&data-size-limit=200000`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    if (!data.operations_result) return [];
+    
+    const curations = [];
+    for (const item of data.operations_result) {
+      if (item.op && item.op.type === 'custom_json_operation') {
+        const val = item.op.value;
+        if (val && val.id && val.id.startsWith('news_')) {
+          try {
+            const signers = [...(val.required_auths || []), ...(val.required_posting_auths || [])];
+            if (signers.includes(adminAccount)) {
+              const json = JSON.parse(val.json);
+              if (json.author && json.permlink) {
+                curations.push({
+                  id: val.id,
+                  author: json.author,
+                  permlink: json.permlink,
+                  date: item.timestamp
+                });
+              }
+            }
+          } catch (e) {}
+        }
+      }
+    }
+    return curations;
+  } catch (error) {
+    console.error("Error fetching admin curations from HAFAH, using fallback:", error);
+    try {
+      const ids = ['news_highlight', 'news_entertainment', 'news_politics', 'news_sport', 'news_philosophy', 'news_crypto', 'news_economy'];
+      const promises = ids.map(async (id) => {
+        try {
+          const res = await fetch(`https://hafsql-api.mahdiyari.info/operations/custom_json/${id}`);
+          if (!res.ok) return [];
+          const arr = await res.json();
+          if (!Array.isArray(arr)) return [];
+          
+          const mapped = [];
+          for (const item of arr) {
+            const signers = [...(item.required_auths || []), ...(item.required_posting_auths || [])];
+            if (signers.includes(adminAccount)) {
+              try {
+                const jsonVal = typeof item.json === 'string' ? JSON.parse(item.json) : item.json;
+                if (jsonVal && jsonVal.author && jsonVal.permlink) {
+                  mapped.push({
+                    id: id,
+                    author: jsonVal.author,
+                    permlink: jsonVal.permlink,
+                    date: item.timestamp
+                  });
+                }
+              } catch (e) {}
+            }
+          }
+          return mapped;
+        } catch (err) {
+          console.error(`Error fetching fallback from hafsql for ${id}:`, err);
+          return [];
+        }
+      });
+      const results = await Promise.all(promises);
+      return results.flat();
+    } catch (fallbackError) {
+      console.error("Curation fallback also failed:", fallbackError);
+      return [];
+    }
+  }
+};

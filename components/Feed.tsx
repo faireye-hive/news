@@ -129,7 +129,7 @@ const Feed: React.FC = () => {
         </div>
       ) : (
         <div className="space-y-6">
-          {posts.map((post) => {
+          {posts.map((post, index) => {
             const upvoted = Array.isArray(post.active_votes) && post.active_votes.some((v: any) => v.voter === user && Number(v.percent) > 0);
             return (
               <div key={`${post.author}-${post.permlink}`} className="bg-card rounded-2xl border border-slate-700/50 p-6 shadow-sm hover:border-cent/30 transition-all flex flex-col md:flex-row gap-6 group">
@@ -139,6 +139,8 @@ const Feed: React.FC = () => {
                       alt="Thumbnail"
                       className="w-full h-48 md:h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => (e.target as HTMLImageElement).src = `https://images.hive.blog/u/${post.author}/avatar`}
+                      fetchPriority={index === 0 ? "high" : "auto"}
+                      loading={index === 0 ? "eager" : "lazy"}
                    />
                 </Link>
                 <div className="flex-1 flex flex-col min-w-0">

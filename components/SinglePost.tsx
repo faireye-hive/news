@@ -65,8 +65,11 @@ const CommentItem: React.FC<{
         bodyToParse = bodyToParse.replace(
           /!\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g,
           (match, alt, url) => {
-            if (url.includes("images.hive.blog")) return match;
-            return `![${alt}](https://images.hive.blog/0x0/${url})`;
+            let finalUrl = url;
+            if (!url.includes("images.hive.blog")) {
+              finalUrl = `https://images.hive.blog/0x0/${url}`;
+            }
+            return `<img src="${finalUrl}" alt="${alt}" loading="lazy" />`;
           },
         );
         const rawHtml = await marked.parse(bodyToParse);
@@ -516,12 +519,15 @@ const SinglePost: React.FC = () => {
           " ![]($1)",
         );
 
-        // Proxy images through images.hive.blog to avoid tracking
+                // Convert markdown images to HTML tags so they parse correctly even inside HTML blocks like <center>
         bodyToParse = bodyToParse.replace(
           /!\[(.*?)\]\((https?:\/\/[^\s)]+)\)/g,
           (match, alt, url) => {
-            if (url.includes("images.hive.blog")) return match;
-            return `![${alt}](https://images.hive.blog/0x0/${url})`;
+            let finalUrl = url;
+            if (!url.includes("images.hive.blog")) {
+              finalUrl = `https://images.hive.blog/0x0/${url}`;
+            }
+            return `<img src="${finalUrl}" alt="${alt}" loading="lazy" />`;
           },
         );
 

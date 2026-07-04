@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   getHivePosts,
   getTribeInfo,
-  getTrendingTags,
+  getTrendingTags, getAdminCuratedPosts, getPostContent, getScotPost,
 } from "../services/hiveEngineService";
 import { HivePost, TribeInfo } from "../types";
 import { communityConfig, bannedUsers } from "../config";
@@ -37,6 +37,8 @@ import {
   Sparkles,
   Hash,
   Layers,
+  Newspaper,
+  BookOpen
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useCommunity } from "../contexts/CommunityContext";
@@ -69,10 +71,113 @@ const getTopicIcon = (id: string, size = 16) => {
   }
 };
 
+const JOURNAL_CATEGORIES = [
+  { id: 'news_entertainment', label: 'Entertainment' },
+  { id: 'news_politics', label: 'Politics' },
+  { id: 'news_sport', label: 'Sport' },
+  { id: 'news_philosophy', label: 'Philosophy' },
+  { id: 'news_crypto', label: 'Crypto' },
+  { id: 'news_economy', label: 'Economy' },
+];
+
+const CATEGORY_THEMES: Record<string, {
+  color: string;
+  border: string;
+  bg: string;
+  hoverText: string;
+  accentText: string;
+  text: string;
+  line: string;
+}> = {
+  news_entertainment: {
+    color: 'text-orange-500',
+    border: 'border-orange-500',
+    bg: 'bg-orange-600 hover:bg-orange-500',
+    hoverText: 'hover:text-orange-400',
+    accentText: 'text-orange-400 group-hover/item:text-orange-300',
+    text: 'text-orange-500',
+    line: 'bg-orange-500'
+  },
+  news_politics: {
+    color: 'text-red-500',
+    border: 'border-red-500',
+    bg: 'bg-red-700 hover:bg-red-600',
+    hoverText: 'hover:text-red-400',
+    accentText: 'text-red-400 group-hover/item:text-red-300',
+    text: 'text-red-500',
+    line: 'bg-red-500'
+  },
+  news_sport: {
+    color: 'text-emerald-500',
+    border: 'border-emerald-500',
+    bg: 'bg-emerald-600 hover:bg-emerald-500',
+    hoverText: 'hover:text-emerald-400',
+    accentText: 'text-emerald-400 group-hover/item:text-emerald-300',
+    text: 'text-emerald-500',
+    line: 'bg-emerald-500'
+  },
+  news_philosophy: {
+    color: 'text-indigo-500',
+    border: 'border-indigo-500',
+    bg: 'bg-indigo-700 hover:bg-indigo-600',
+    hoverText: 'hover:text-indigo-400',
+    accentText: 'text-indigo-400 group-hover/item:text-indigo-300',
+    text: 'text-indigo-500',
+    line: 'bg-indigo-500'
+  },
+  news_crypto: {
+    color: 'text-amber-500',
+    border: 'border-amber-500',
+    bg: 'bg-amber-600 hover:bg-amber-500',
+    hoverText: 'hover:text-amber-400',
+    accentText: 'text-amber-400 group-hover/item:text-amber-300',
+    text: 'text-amber-500',
+    line: 'bg-amber-500'
+  },
+  news_economy: {
+    color: 'text-cyan-500',
+    border: 'border-cyan-500',
+    bg: 'bg-cyan-600 hover:bg-cyan-500',
+    hoverText: 'hover:text-cyan-400',
+    accentText: 'text-cyan-400 group-hover/item:text-cyan-300',
+    text: 'text-cyan-500',
+    line: 'bg-cyan-500'
+  }
+};
+
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  news_entertainment: ['news_entertainment', 'entertainment', 'entretenimento', 'art', 'music', 'cinema', 'tv', 'culture', 'filme', 'musica', 'geek', 'pop'],
+  news_politics: ['news_politics', 'politics', 'politica', 'governo', 'geopolitics', 'worldnews', 'news'],
+  news_sport: ['news_sport', 'sport', 'sports', 'esporte', 'esportes', 'futebol', 'soccer', 'football', 'mma', 'ufc', 'basketball'],
+  news_philosophy: ['news_philosophy', 'philosophy', 'filosofia', 'history', 'historia', 'science', 'ciencia', 'books', 'livros'],
+  news_crypto: ['news_crypto', 'crypto', 'bitcoin', 'hive', 'blockchain', 'ethereum', 'cryptocurrency', 'token', 'web3', 'pob', 'news-crypto'],
+  news_economy: ['news_economy', 'economy', 'economia', 'finance', 'financas', 'business', 'negocios', 'investing', 'investimentos', 'money']
+};
+
+const getPostTags = (post: HivePost): string[] => {
+  const tags: string[] = [];
+  if (post.parent_permlink) {
+    tags.push(post.parent_permlink.toLowerCase());
+  }
+  if (post.json_metadata) {
+    try {
+      const meta = typeof post.json_metadata === 'string' ? JSON.parse(post.json_metadata) : post.json_metadata;
+      if (meta && Array.isArray(meta.tags)) {
+        meta.tags.forEach((t: any) => {
+          if (typeof t === 'string') {
+            tags.push(t.toLowerCase());
+          }
+        });
+      }
+    } catch (e) {}
+  }
+  return Array.from(new Set(tags));
+};
+
 const Explorer: React.FC = () => {
-  const { user, vote } = useAuth();
+  const { user, vote, customJson } = useAuth();
   const { community } = useCommunity();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [, setSearchParams] = useSearchParams();
   const globalLocation = useLocation();
   const actualLocation = globalLocation.state?.backgroundLocation || globalLocation;
@@ -100,6 +205,16 @@ const Explorer: React.FC = () => {
       (localStorage.getItem("explorer_view_mode") as "grid" | "list") || "grid"
     );
   });
+  
+  const [layoutMode, setLayoutMode] = useState<"classic" | "journal">(() => {
+    return (
+      (localStorage.getItem("explorer_layout_mode") as "classic" | "journal") || "journal"
+    );
+  });
+  const [curatedPosts, setCuratedPosts] = useState<any[]>([]);
+  const [cacheList, setCacheList] = useState<HivePost[]>([]);
+  const [loadingCurations, setLoadingCurations] = useState(false);
+  const [curatingPost, setCuratingPost] = useState<HivePost | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<
     "collapsed" | "expanded"
   >(() => {
@@ -118,6 +233,55 @@ const Explorer: React.FC = () => {
     }
   });
   const [trendingTags, setTrendingTags] = useState<string[]>([]);
+
+  const fetchCurations = async () => {
+    setLoadingCurations(true);
+    try {
+      // 1. Fetch 200 latest discussions from SCOT (Cache)
+      const cache = await getHivePosts(community, 'created', 200);
+      setCacheList(cache);
+
+      // 2. Fetch admin curation list
+      const curations = await getAdminCuratedPosts('faireye');
+
+      // 3. Match curation list to cache or fetch individually
+      const withContent = await Promise.all(curations.map(async (c: any) => {
+        let post = cache.find(p => p.author === c.author && p.permlink === c.permlink);
+        if (!post) {
+          post = await getScotPost(c.author, c.permlink, community);
+        }
+        if (!post) {
+          post = await getPostContent(c.author, c.permlink);
+        }
+        return { ...c, post };
+      }));
+
+      setCuratedPosts(withContent.filter(c => c.post));
+    } catch (error) {
+      console.error("Error fetching curations:", error);
+    } finally {
+      setLoadingCurations(false);
+    }
+  };
+
+  const handleCurate = async (post: HivePost, flair: string) => {
+    const json = {
+      author: post.author,
+      permlink: post.permlink,
+      link: `/@${post.author}/${post.permlink}`,
+      date: new Date().toISOString()
+    };
+    try {
+      await customJson(`news_${flair}`, json, `Curate ${flair}`);
+      alert(`Successfully curated under news_${flair}!`);
+      // Reload curated posts
+      if (layoutMode === "journal") {
+        fetchCurations();
+      }
+    } catch (err: any) {
+      alert("Failed to curate: " + (err.message || err));
+    }
+  };
 
   const toggleFavorite = (e: React.MouseEvent, tagStr: string) => {
     e.stopPropagation();
@@ -152,6 +316,13 @@ const Explorer: React.FC = () => {
   }).filter(Boolean) as any[];
 
   // If URL changes, update the states
+
+  useEffect(() => {
+    if (layoutMode === "journal") {
+      fetchCurations();
+    }
+  }, [layoutMode, community]);
+
   useEffect(() => {
     const params = new URLSearchParams(actualLocation.search);
     const freshTag = params.get("tag") || "";
@@ -165,6 +336,10 @@ const Explorer: React.FC = () => {
   useEffect(() => {
     localStorage.setItem("explorer_view_mode", viewMode);
   }, [viewMode]);
+
+  useEffect(() => {
+    localStorage.setItem("explorer_layout_mode", layoutMode);
+  }, [layoutMode]);
 
   useEffect(() => {
     localStorage.setItem("explorer_sidebar_mode", sidebarCollapsed);
@@ -393,88 +568,82 @@ const Explorer: React.FC = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-8">
-      {/* Breadcrumb */}
-      <nav className="flex text-sm text-slate-400 font-medium whitespace-nowrap overflow-x-auto pb-2 scrollbar-none items-center gap-2">
-        <Link
-          to="/discovery"
-          className="hover:text-white flex items-center gap-1.5 transition-colors"
-        >
-          <Home size={14} /> {t("nav.discover")}
-        </Link>
-        <ChevronRight size={14} className="opacity-50 shrink-0" />
-        <Link
-          to="/explorer"
-          onClick={(e) => {
-            if (!tag) e.preventDefault();
-            setSearchParams({});
-          }}
-          className={`transition-colors ${!tag ? "text-white" : "hover:text-white"}`}
-        >
-          {t("nav.explorer")}
-        </Link>
-        {tag && (
-          <>
-            <ChevronRight size={14} className="opacity-50 shrink-0" />
-            <span className="text-white capitalize truncate max-w-[150px] sm:max-w-none px-2 py-0.5 bg-slate-800 rounded-md shadow-sm border border-slate-700/50">
-              #{tag}
-            </span>
-          </>
-        )}
-      </nav>
+    <div className="space-y-6 animate-fade-in pb-8">
+      
 
-      <div className="flex flex-col sm:flex-row justify-between items-center bg-card p-6 rounded-2xl border border-slate-700/50 shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 py-12 px-16 bg-cent/5 blur-[80px] rounded-full pointer-events-none"></div>
-        <div className="w-full sm:w-auto mb-4 sm:mb-0 relative z-10">
-          <h2 className="text-2xl lg:text-3xl font-extrabold text-white flex items-center gap-2">
-            <span className="text-cent">#{community}</span>{" "}
+      <div className="flex flex-col md:flex-row justify-between items-center bg-card p-3 sm:p-4 rounded-xl border border-slate-700/50 shadow-lg relative overflow-hidden gap-3">
+        <div className={`absolute top-0 right-0 py-8 px-12 blur-[80px] rounded-full pointer-events-none ${layoutMode === "journal" ? "bg-hive/5" : "bg-cent/5"}`}></div>
+        <div className="w-full md:w-auto relative z-10">
+          <h2 className="text-xl sm:text-2xl font-extrabold text-white flex items-center gap-2">
+            <span className={layoutMode === "journal" ? "text-hive" : "text-cent"}>#{community}</span>{" "}
             {t("explorer.title")}
           </h2>
-          <p className="text-slate-400 text-sm mt-2 flex items-center gap-2 font-medium">
+          <p className="text-slate-400 text-xs mt-1.5 flex items-center gap-2 font-medium">
             {t("explorer.subtitle")}
             {tribeInfo && tribeInfo.reward_pool && (
-              <span className="bg-slate-800 text-xs px-2 py-0.5 rounded text-cent border border-cent/20 font-mono">
+              <span className={`bg-slate-800 text-[10px] px-2 py-0.5 rounded font-mono ${layoutMode === "journal" ? "text-slate-300 border border-slate-700" : "text-cent border border-cent/20"}`}>
                 Pool: {parseFloat(tribeInfo.reward_pool).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: tribeInfo.precision ?? 2 })} {community}
               </span>
             )}
           </p>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto relative z-10">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto relative z-10">
           <div className="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-start">
             <Link
               to="/create-post"
-              className="flex items-center gap-2 bg-cent text-slate-900 px-4 py-2.5 text-sm rounded-lg font-bold hover:shadow-[0_0_15px_rgba(255,200,0,0.3)] transition-all whitespace-nowrap"
+              className={`flex items-center gap-1.5 ${layoutMode === "journal" ? "bg-white text-slate-900" : "bg-cent text-slate-900"} px-3.5 py-2 text-xs rounded-lg font-bold hover:shadow-[0_0_15px_rgba(255,200,0,0.3)] transition-all whitespace-nowrap`}
             >
-              <Edit3 size={16} />
+              <Edit3 size={14} />
               {t("nav.post")}
             </Link>
-
-            <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-700 shadow-inner">
+            
+            <div className="flex bg-slate-900 p-0.5 rounded-lg border border-slate-700 shadow-inner">
               <button
-                onClick={() => setViewMode("grid")}
-                className={`p-1.5 rounded-md transition-all ${viewMode === "grid" ? "bg-slate-800 text-cent shadow border border-slate-700/50" : "text-slate-500 hover:text-white"}`}
-                title="Modo Grid"
+                onClick={() => setLayoutMode("classic")}
+                className={`p-1 px-2.5 flex items-center gap-1.5 text-xs font-bold rounded-md transition-all ${layoutMode === "classic" ? "bg-slate-800 text-cent shadow border border-slate-700/50" : "text-slate-500 hover:text-white"}`}
+                title="Design Classic"
               >
-                <LayoutGrid size={18} />
+                <Layers size={14} />
+                <span className="hidden sm:inline">Classic</span>
               </button>
               <button
-                onClick={() => setViewMode("list")}
-                className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? "bg-slate-800 text-cent shadow border border-slate-700/50" : "text-slate-500 hover:text-white"}`}
-                title="Modo Lista"
+                onClick={() => setLayoutMode("journal")}
+                className={`p-1 px-2.5 flex items-center gap-1.5 text-xs font-bold rounded-md transition-all ${layoutMode === "journal" ? "bg-slate-800 text-white shadow border border-slate-700/50" : "text-slate-500 hover:text-white"}`}
+                title="Design Jornal"
               >
-                <List size={18} />
+                <Newspaper size={14} />
+                <span className="hidden sm:inline">Journal</span>
               </button>
             </div>
+
+            {layoutMode === "classic" && (
+              <div className="flex bg-slate-900 p-0.5 rounded-lg border border-slate-700 shadow-inner">
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`p-1 rounded-md transition-all ${viewMode === "grid" ? "bg-slate-800 text-cent shadow border border-slate-700/50" : "text-slate-500 hover:text-white"}`}
+                  title="Modo Grid"
+                >
+                  <LayoutGrid size={15} />
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`p-1 rounded-md transition-all ${viewMode === "list" ? "bg-slate-800 text-cent shadow border border-slate-700/50" : "text-slate-500 hover:text-white"}`}
+                  title="Modo Lista"
+                >
+                  <List size={15} />
+                </button>
+              </div>
+            )}
           </div>
-          <div className="flex bg-slate-900 p-1 rounded-lg border border-slate-700 w-full sm:w-auto overflow-x-auto shadow-inner">
+          <div className="flex bg-slate-900 p-0.5 rounded-lg border border-slate-700 w-full sm:w-auto overflow-x-auto shadow-inner">
             {(["created", "trending", "hot"] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setSort(s)}
-                className={`px-4 py-2 rounded-md text-sm font-bold transition-all capitalize whitespace-nowrap ${
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all capitalize whitespace-nowrap ${
                   sort === s
-                    ? "bg-cent text-slate-900 shadow-lg"
+                    ? (layoutMode === "journal" ? "bg-white text-slate-900 shadow-lg" : "bg-cent text-slate-900 shadow-lg")
                     : "text-slate-400 hover:text-white hover:bg-slate-800/50"
                 }`}
               >
@@ -490,10 +659,10 @@ const Explorer: React.FC = () => {
       </div>
 
       {/* Mobile Trending Tags */}
-      <div className="lg:hidden w-full overflow-x-auto py-2 flex items-center gap-2 scrollbar-hide mb-2 mt-4">
+      <div className="lg:hidden w-full overflow-x-auto py-1.5 flex items-center gap-2 scrollbar-hide mb-1 mt-2">
         <button
           onClick={() => setSearchParams({})}
-          className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${!tag ? "bg-cent text-slate-900 font-bold" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
+          className={`shrink-0 px-3.5 py-1 rounded-full text-xs font-medium transition-colors ${!tag ? "bg-cent text-slate-900 font-bold" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
         >
           {t("explorer.all")}
         </button>
@@ -501,18 +670,45 @@ const Explorer: React.FC = () => {
           <button
             key={`mob-${tStr}`}
             onClick={() => setSearchParams({ tag: tStr })}
-            className={`shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${tag === tStr ? "bg-cent text-slate-900 font-bold" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
+            className={`shrink-0 px-3.5 py-1 rounded-full text-xs font-medium transition-colors ${tag === tStr ? "bg-cent text-slate-900 font-bold" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}
           >
             #{tStr}
           </button>
         ))}
       </div>
 
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-xs text-slate-500 font-medium px-2 py-1 select-none">
+        <button
+          onClick={() => setSearchParams({})}
+          className="flex items-center gap-1 hover:text-white transition-colors"
+        >
+          <Home size={14} />
+          <span>Home</span>
+        </button>
+        <ChevronRight size={12} className="text-slate-600" />
+        <button
+          onClick={() => setSearchParams({})}
+          className={`hover:text-white transition-colors ${!tag ? "text-slate-300 font-bold" : ""}`}
+        >
+          Explorer
+        </button>
+        {tag && (
+          <>
+            <ChevronRight size={12} className="text-slate-600" />
+            <span className={layoutMode === "journal" ? "text-hive font-bold uppercase" : "text-cent font-bold uppercase"}>
+              #{tag}
+            </span>
+          </>
+        )}
+      </nav>
+
       <div className="flex flex-col lg:flex-row gap-8 relative">
         {/* Sidebar */}
-        <div
-          className={`shrink-0 transition-all duration-300 hidden lg:block ${sidebarCollapsed === "expanded" ? "lg:w-64" : "lg:w-12"}`}
-        >
+        {layoutMode !== "journal" && (
+          <div
+            className={`shrink-0 transition-all duration-300 hidden lg:block ${sidebarCollapsed === "expanded" ? "lg:w-64" : "lg:w-12"}`}
+          >
           <div className="bg-card p-5 rounded-2xl border border-slate-700/50 shadow-lg sticky top-24">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-700/50">
               {sidebarCollapsed === "expanded" && (
@@ -669,7 +865,7 @@ const Explorer: React.FC = () => {
                                     onClick={() =>
                                       setSearchParams({ tag: sub })
                                     }
-                                    className={`w-full text-left px-3 py-1.5 pr-8 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${tag === sub ? "text-cent bg-cent/10 font-bold" : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"}`}
+                                    className={`w-full text-left px-3 py-1.5 pr-8 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${tag === sub ? (layoutMode === "journal" ? "text-white bg-slate-800" : "text-cent bg-cent/10") + " font-bold" : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"}`}
                                   >
                                     <Hash size={12} className="opacity-50" />
                                     <span className="truncate block">
@@ -739,33 +935,47 @@ const Explorer: React.FC = () => {
             )}
           </div>
         </div>
+        )}
 
         {/* Main Content */}
         <div className="flex-1 min-w-0 transition-all duration-300">
-          {loading ? (
-            <div
-              className={
-                viewMode === "grid"
-                  ? `grid grid-cols-1 md:grid-cols-2 ${sidebarCollapsed === "collapsed" ? "lg:grid-cols-3 xl:grid-cols-4" : "lg:grid-cols-2 xl:grid-cols-3"} gap-6`
-                  : "flex flex-col gap-4"
-              }
-            >
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div
-                  key={i}
-                  className={`bg-card animate-pulse border border-slate-700/50 ${viewMode === "grid" ? "rounded-xl h-80" : "rounded-xl h-36 flex flex-col justify-center"}`}
-                >
-                  {viewMode === "grid" && (
-                    <div className="h-40 bg-slate-700/50 rounded-t-xl"></div>
-                  )}
-                  <div className="p-5 space-y-3">
-                    <div className="h-4 bg-slate-700/50 rounded w-3/4"></div>
-                    <div className="h-4 bg-slate-700/50 rounded w-1/2"></div>
-                    <div className="h-4 bg-slate-700/50 rounded w-1/4 mt-4"></div>
-                  </div>
+          {loading || (layoutMode === "journal" && !tag && loadingCurations) ? (
+            layoutMode === "journal" && !tag ? (
+              <div className="space-y-12 animate-pulse">
+                <div className="h-[400px] bg-slate-800/30 rounded-2xl border border-slate-700/40"></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {[1, 2, 3, 4, 5, 6].map((i) => (
+                    <div key={i} className="h-72 bg-slate-800/30 rounded-2xl border border-slate-700/40"></div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div
+                className={
+                  layoutMode === "journal"
+                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
+                    : viewMode === "grid"
+                    ? `grid grid-cols-1 md:grid-cols-2 ${sidebarCollapsed === "collapsed" ? "lg:grid-cols-3 xl:grid-cols-4" : "lg:grid-cols-2 xl:grid-cols-3"} gap-6`
+                    : "flex flex-col gap-4"
+                }
+              >
+                {[1, 2, 3, 4, 5, 6].map((i) => (
+                  <div
+                    key={i}
+                    className={`bg-card animate-pulse border border-slate-700/50 ${viewMode === "grid" ? "rounded-xl h-80" : "rounded-xl h-36 flex flex-col justify-center"}`}
+                  >
+                    {viewMode === "grid" && (
+                      <div className="h-40 bg-slate-700/50 rounded-t-xl"></div>
+                    )}
+                    <div className="p-5 space-y-3">
+                      <div className="h-4 bg-slate-700/50 rounded w-3/4"></div>
+                      <div className="h-4 bg-slate-700/50 rounded w-1/2"></div>
+                      <div className="h-4 bg-slate-700/50 rounded w-1/4 mt-4"></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : posts.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center bg-card rounded-2xl border border-slate-700/50">
               <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mb-4">
@@ -780,7 +990,7 @@ const Explorer: React.FC = () => {
                   <span>
                     {" "}
                     com a tag{" "}
-                    <span className="font-mono text-cent bg-cent/10 px-1.5 py-0.5 rounded">
+                    <span className={`font-mono ${layoutMode === "journal" ? "text-white bg-slate-800" : "text-cent bg-cent/10"} px-1.5 py-0.5 rounded`}>
                       #{tag}
                     </span>
                   </span>
@@ -797,15 +1007,342 @@ const Explorer: React.FC = () => {
                 {t("explorer.createPost")}
               </Link>
             </div>
+          ) : layoutMode === "journal" && !tag ? (
+            <div className="space-y-12 animate-fade-in pb-12">
+               {/* Hero Section: news_highlight */}
+               {(() => {
+                 const highlightCuration = curatedPosts.find(c => c.id === 'news_highlight');
+                 const highlightPost = highlightCuration?.post || posts[0];
+                 if (!highlightPost) return null;
+
+                 const thumbnail = extractImage(highlightPost);
+                 const reward = getCalculatedReward(highlightPost);
+                 const excerpt = getExcerpt(highlightPost.desc || highlightPost.body, 220);
+                 const { up } = getVoteCounts(highlightPost);
+                 const userHasVoted = user && highlightPost.active_votes?.some((v) => v.voter === user);
+                 const isVotingThis = votingPost === highlightPost.permlink;
+
+                 return (
+                   <div className="group flex flex-col lg:flex-row gap-8 items-stretch pb-12 border-b border-slate-800 animate-fade-in">
+                     <div className="w-full lg:w-3/5 h-[320px] sm:h-[420px] lg:h-[450px] rounded-2xl overflow-hidden bg-slate-900 relative shadow-inner shrink-0">
+                       {thumbnail ? (
+                         <img
+                           src={`https://images.hive.blog/800x0/${thumbnail}`}
+                           alt={highlightPost.title}
+                           className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-700 ease-out"
+                           onError={(e) => {
+                             (e.target as HTMLImageElement).src = "https://placehold.co/800x600/0f172a/334155?text=Highlighted+News";
+                           }}
+                         />
+                       ) : (
+                         <div className="w-full h-full flex items-center justify-center bg-slate-900 text-slate-700 border border-slate-800 rounded-2xl">
+                           <BookOpen size={64} strokeWidth={1} />
+                         </div>
+                       )}
+                       <div className="absolute top-4 left-4">
+                         <span className="bg-red-600 text-white px-3 py-1 text-xs font-black uppercase tracking-wider rounded-md shadow-lg flex items-center gap-1.5 animate-pulse">
+                           <Sparkles size={12} className="fill-white" />
+                           Highlight
+                         </span>
+                       </div>
+                     </div>
+                     
+                     <div className="flex flex-col justify-between w-full lg:w-2/5 py-2">
+                       <div>
+                         <div className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">
+                           <Link to={`/profile/${highlightPost.author}`} className="hover:text-white transition-colors flex items-center gap-2">
+                             <img src={`https://images.hive.blog/u/${highlightPost.author}/avatar`} alt={highlightPost.author} className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700" />
+                             <span className="font-extrabold text-slate-300 hover:text-white">@{highlightPost.author}</span>
+                           </Link>
+                           <span>&bull;</span>
+                           <span className="font-mono text-slate-500">{timeAgo(highlightPost.created)}</span>
+                         </div>
+                         
+                         <Link to={`/@${highlightPost.author}/${highlightPost.permlink}`} state={{ backgroundLocation: actualLocation }} className="block">
+                           <h2 className="font-serif font-black text-white text-3xl sm:text-4xl leading-tight mb-4 group-hover:text-hive transition-colors">
+                             {highlightPost.title}
+                           </h2>
+                           <p className="text-slate-400 font-serif leading-relaxed text-sm sm:text-base line-clamp-4">
+                             {excerpt}
+                           </p>
+                         </Link>
+                       </div>
+
+                       <div className="pt-6 flex items-center justify-between border-t border-slate-800/80 text-slate-500 text-sm mt-6">
+                         <div className="flex items-center gap-4">
+                           <button
+                             onClick={() => handleVoteClick(highlightPost)}
+                             disabled={userHasVoted || isVotingThis}
+                             className={`flex items-center gap-1.5 transition-colors ${userHasVoted ? "text-hive" : "hover:text-hive"}`}
+                           >
+                             {isVotingThis ? (
+                               <Loader2 size={16} className="animate-spin" />
+                             ) : (
+                               <Heart size={16} className={userHasVoted ? "fill-hive" : ""} />
+                             )}
+                             <span className="font-bold">{up}</span>
+                           </button>
+                           <Link to={`/@${highlightPost.author}/${highlightPost.permlink}#comments`} state={{ backgroundLocation: actualLocation }} className="flex items-center gap-1.5 hover:text-white transition-colors">
+                             <MessageCircle size={16} />
+                             <span className="font-bold">{highlightPost.children}</span>
+                           </Link>
+                         </div>
+                         
+                         <div className="flex items-center gap-3">
+                           <div className="font-mono font-bold text-white bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-xs">
+                             {reward} {community}
+                           </div>
+                           
+                           {user === "faireye" && (
+                             <div className="relative">
+                               <button
+                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCuratingPost(curatingPost?.permlink === highlightPost.permlink ? null : highlightPost); }}
+                                 className="text-xs font-bold text-hive border border-hive px-2.5 py-1 rounded hover:bg-hive hover:text-white transition-all flex items-center gap-1 bg-slate-900/50"
+                               >
+                                 Curate
+                               </button>
+                               {curatingPost?.permlink === highlightPost.permlink && (
+                                 <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 p-2 flex flex-col gap-1 animate-fade-in">
+                                   {['highlight', 'entertainment', 'politics', 'sport', 'philosophy', 'crypto', 'economy'].map(flair => (
+                                     <button
+                                       key={flair}
+                                       onClick={async (e) => {
+                                         e.preventDefault();
+                                         e.stopPropagation();
+                                         await handleCurate(highlightPost, flair);
+                                         setCuratingPost(null);
+                                       }}
+                                       className="text-left px-2 py-1.5 text-xs hover:bg-slate-800 rounded text-slate-200 uppercase tracking-wider font-semibold"
+                                     >
+                                       {flair}
+                                     </button>
+                                   ))}
+                                 </div>
+                               )}
+                             </div>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+                   </div>
+                 );
+               })()}
+
+               {/* Categories Grid + Ad Space */}
+               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                 {JOURNAL_CATEGORIES.map((cat) => {
+                   // Filter and sort curated posts for this category by date descending
+                   const catCurations = curatedPosts
+                     .filter((c) => c.id === cat.id)
+                     .sort((a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime());
+
+                   // Deduplicate curated posts to avoid displaying the same post multiple times
+                   const seenCurations = new Set<string>();
+                   const uniqueCatCurations = catCurations.filter((c) => {
+                     const key = `${c.author}/${c.permlink}`;
+                     if (seenCurations.has(key)) return false;
+                     seenCurations.add(key);
+                     return true;
+                   });
+
+                   const catPost = uniqueCatCurations[0]?.post;
+
+                   if (!catPost) {
+                     return (
+                       <div key={cat.id} className="bg-card/40 border border-slate-700/50 rounded-2xl p-6 flex flex-col justify-center items-center text-center h-80">
+                         <span className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">#{cat.label}</span>
+                         <p className="text-slate-500 text-xs font-medium">Waiting for curation...</p>
+                       </div>
+                     );
+                   }
+
+                   const thumbnail = extractImage(catPost);
+                   const reward = getCalculatedReward(catPost);
+                   const { up } = getVoteCounts(catPost);
+                   const userHasVoted = user && catPost.active_votes?.some((v) => v.voter === user);
+                   const isVotingThis = votingPost === catPost.permlink;
+
+                   // Get up to 3 secondary curated posts (the previous curations for this exact category)
+                   const subPosts = uniqueCatCurations
+                     .slice(1, 4)
+                     .map((c) => c.post)
+                     .filter(Boolean);
+
+                    const theme = CATEGORY_THEMES[cat.id] || {
+                      color: 'text-slate-400',
+                      border: 'border-slate-800',
+                      bg: 'bg-slate-800',
+                      hoverText: 'hover:text-white',
+                      accentText: 'text-slate-400',
+                      text: 'text-slate-400',
+                      line: 'bg-slate-700'
+                    };
+
+                    const localizedLabel = language === 'pt' ? (
+                      cat.id === 'news_entertainment' ? 'Entretenimento' :
+                      cat.id === 'news_politics' ? 'Política' :
+                      cat.id === 'news_sport' ? 'Esporte' :
+                      cat.id === 'news_philosophy' ? 'Filosofia' :
+                      cat.id === 'news_crypto' ? 'Cripto' :
+                      cat.id === 'news_economy' ? 'Economia' :
+                      cat.label
+                    ) : cat.label;
+
+                    return (
+                      <div key={cat.id} className="flex flex-col">
+                        {/* Column Header - Styled beautifully like the screenshot */}
+                        <div className="border-b border-slate-700 pb-2 mb-6 flex items-center justify-between">
+                          <div className="relative">
+                            <h2 className={`font-serif font-black text-2xl tracking-tight ${theme.text}`}>
+                              {localizedLabel}
+                            </h2>
+                            <div className={`absolute bottom-[-9px] left-0 h-1 w-12 ${theme.line}`} />
+                          </div>
+                          <span className="w-1.5 h-1.5 rounded-full bg-slate-600"></span>
+                        </div>
+
+                         {/* Main Featured Card - Borderless with transparent background and exact width matching text */}
+                        <div className="group/card flex flex-col bg-transparent transition-all duration-300">
+                          <div className="h-48 bg-slate-950 shrink-0 relative overflow-hidden rounded-2xl mb-4 border border-slate-700/50">
+                            {thumbnail ? (
+                              <img
+                                src={`https://images.hive.blog/400x0/${thumbnail}`}
+                                alt={catPost.title}
+                                className="w-full h-full object-cover group-hover/card:scale-102 transition-all duration-500"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = "https://placehold.co/400x300/0f172a/334155?text=No+Image";
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-700 bg-slate-950">
+                                <BookOpen size={36} strokeWidth={1} />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Seamless transparent details section */}
+                          <div className="flex flex-col flex-1 bg-transparent text-white transition-colors duration-300 min-h-[150px]">
+                            <Link to={`/@${catPost.author}/${catPost.permlink}`} state={{ backgroundLocation: actualLocation }} className="block">
+                              <h3 className="font-serif font-bold text-slate-100 text-lg sm:text-xl leading-snug line-clamp-2 hover:text-hive transition-colors mb-2">
+                                {catPost.title}
+                              </h3>
+                            </Link>
+                            <p className="text-slate-300 text-sm line-clamp-2 leading-relaxed mb-4">
+                              {getExcerpt(catPost.desc || catPost.body, 100)}
+                            </p>
+
+                            <div className="flex items-center justify-between text-slate-400 text-xs pt-3 border-t border-slate-700/50 mt-auto">
+                              <Link to={`/profile/${catPost.author}`} className="font-mono text-xs text-slate-300 hover:text-hive hover:underline transition-colors font-semibold">
+                                @{catPost.author}
+                              </Link>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => handleVoteClick(catPost)}
+                                  disabled={userHasVoted || isVotingThis}
+                                  className={`flex items-center gap-1.5 text-xs font-semibold hover:text-hive transition-colors ${userHasVoted ? "text-hive" : "text-slate-400"}`}
+                                >
+                                  {isVotingThis ? (
+                                    <Loader2 size={13} className="animate-spin" />
+                                  ) : (
+                                    <Heart size={13} className={userHasVoted ? "fill-hive" : ""} />
+                                  )}
+                                  {up}
+                                </button>
+                                <span className="font-mono font-bold text-white bg-slate-800 border border-slate-700/60 px-2 py-0.5 rounded text-xs">{reward}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Dashed separator line between featured post and secondary posts */}
+                        {subPosts.length > 0 && (
+                          <div className="border-t border-dashed border-slate-700 my-5" />
+                        )}
+
+                        {/* Secondary Related News Items - Listed elegantly below the dashed divider */}
+                        {subPosts.length > 0 && (
+                          <div className="space-y-4">
+                            {subPosts.map((sub) => {
+                              const subReward = getCalculatedReward(sub);
+                              const subThumbnail = extractImage(sub);
+                              return (
+                                <div key={`${sub.author}-${sub.permlink}`} className="flex gap-3 py-3 border-b border-dashed border-slate-700/60 last:border-0 group/item items-start">
+                                  {/* Small Thumbnail */}
+                                  <div className="w-16 h-12 bg-slate-950 rounded-lg overflow-hidden shrink-0 relative border border-slate-700/50">
+                                    {subThumbnail ? (
+                                      <img
+                                        src={`https://images.hive.blog/120x120/${subThumbnail}`}
+                                        alt={sub.title}
+                                        className="w-full h-full object-cover group-hover/item:scale-105 transition-all duration-300"
+                                        onError={(e) => {
+                                          (e.target as HTMLImageElement).src = "https://placehold.co/120x120/0f172a/334155?text=No+Image";
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center text-slate-700 bg-slate-900">
+                                        <BookOpen size={16} strokeWidth={1} />
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  {/* Title & Metadata */}
+                                  <div className="flex-1 min-w-0">
+                                    <Link 
+                                      to={`/@${sub.author}/${sub.permlink}`} 
+                                      state={{ backgroundLocation: actualLocation }}
+                                      className="block"
+                                    >
+                                      <h4 className="font-serif font-bold text-sm text-slate-200 hover:text-hive group-hover/item:text-hive transition-colors leading-snug line-clamp-2">
+                                        {sub.title}
+                                      </h4>
+                                    </Link>
+                                    <div className="flex items-center justify-between mt-1 text-[11px] text-slate-400 font-mono">
+                                      <Link to={`/profile/${sub.author}`} className="hover:text-hive hover:underline transition-colors">
+                                        @{sub.author}
+                                      </Link>
+                                      <span className="text-slate-300 font-semibold">{subReward} {community}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    );
+                 })}
+
+                 {/* Sponsored Ads Slot */}
+                 <div className="bg-gradient-to-br from-slate-950 to-slate-900 border border-dashed border-slate-700 rounded-2xl p-6 flex flex-col justify-between items-center text-center h-72 shadow-lg relative overflow-hidden">
+                   <div className="absolute top-0 right-0 bg-slate-800 text-slate-400 border-l border-b border-slate-700 text-[9px] font-bold px-2 py-0.5 uppercase tracking-wider rounded-bl">
+                     Sponsored
+                   </div>
+                   <div className="my-auto flex flex-col items-center">
+                     <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-slate-500 mb-3">
+                       <Sparkles size={16} className="text-hive animate-pulse" />
+                     </div>
+                     <h4 className="text-xs font-bold text-slate-200 mb-1 uppercase tracking-wider">Patrocinador do Diário</h4>
+                     <p className="text-slate-400 text-[10px] max-w-[190px] leading-relaxed">
+                       Anuncie com a comunidade #NEWS. Alcance milhares de investidores e entusiastas Web3.
+                     </p>
+                   </div>
+                   <button className="bg-slate-900 hover:bg-slate-850 text-slate-300 hover:text-white font-bold text-[10px] py-2 px-3.5 rounded-xl border border-slate-800 transition-all uppercase tracking-wider">
+                     Reservar Espaço
+                   </button>
+                 </div>
+               </div>
+             </div>
           ) : (
             <div
               className={
-                viewMode === "grid"
+                layoutMode === "journal"
+                  ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
+                  : viewMode === "grid"
                   ? `grid grid-cols-1 md:grid-cols-2 ${sidebarCollapsed === "collapsed" ? "lg:grid-cols-3 xl:grid-cols-4" : "lg:grid-cols-2 xl:grid-cols-3"} gap-6`
                   : "flex flex-col gap-5"
               }
             >
-              {posts.map((post) => {
+              {posts.map((post, index) => {
                 const thumbnail = extractImage(post);
                 const reward = getCalculatedReward(post);
                 const isPaid =
@@ -833,6 +1370,89 @@ const Explorer: React.FC = () => {
                   ) ||
                   postTags[0];
 
+
+                if (layoutMode === "journal") {
+                  const isFeatured = index === 0;
+                  return (
+                    <div
+                      key={`${post.author}-${post.permlink}`}
+                      className={`group flex ${isFeatured ? "flex-col lg:flex-row gap-8 lg:items-center col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-4 pb-12 border-b border-slate-800" : "flex-col gap-4"}`}
+                    >
+                      <div className={`shrink-0 ${isFeatured ? "w-full lg:w-2/3 h-[400px] lg:h-[500px]" : "w-full h-48 sm:h-56"} rounded-xl overflow-hidden bg-slate-900 relative`}>
+                        {thumbnail ? (
+                          <img
+                            src={`https://images.hive.blog/${isFeatured ? '800x0' : '400x0'}/${thumbnail}`}
+                            alt={post.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                            onError={(e) => {
+                              (e.target).src = "https://placehold.co/600x400/0f172a/334155?text=News";
+                            }}
+                            fetchPriority={index === 0 ? "high" : "auto"}
+                            loading={index === 0 ? "eager" : "lazy"}
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center bg-slate-900 border border-slate-800 text-slate-700">
+                             <BookOpen size={48} strokeWidth={1} />
+                          </div>
+                        )}
+                        <div className="absolute top-4 left-4 flex gap-2">
+                          {mainTag && (
+                            <span className="bg-hive text-white px-3 py-1 text-xs font-bold uppercase tracking-wider rounded shadow-sm">
+                              {mainTag}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className={`flex flex-col flex-1 ${isFeatured ? "lg:py-8" : ""}`}>
+                        <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                          <Link to={`/profile/${post.author}`} className="hover:text-white transition-colors flex items-center gap-2">
+                            <img src={`https://images.hive.blog/u/${post.author}/avatar`} alt={post.author} className="w-6 h-6 rounded-full bg-slate-800" />
+                            {post.author}
+                          </Link>
+                          <span>&bull;</span>
+                          <span>{timeAgo(post.created)}</span>
+                        </div>
+                        
+                        <Link to={`/@${post.author}/${post.permlink}`} state={{ backgroundLocation: actualLocation }} className="block group-hover:text-slate-300 transition-colors">
+                          <h3 className={`font-serif font-bold text-white leading-tight ${isFeatured ? "text-3xl sm:text-4xl lg:text-5xl mb-4" : "text-xl sm:text-2xl mb-2 line-clamp-3"}`}>
+                            {post.title}
+                          </h3>
+                          {excerpt && (
+                            <p className={`text-slate-400 font-serif leading-relaxed ${isFeatured ? "text-lg sm:text-xl line-clamp-4" : "text-sm line-clamp-3"}`}>
+                              {excerpt}
+                            </p>
+                          )}
+                        </Link>
+                        
+                        <div className="mt-auto pt-4 flex items-center justify-between text-slate-500 text-sm">
+                          <div className="flex items-center gap-4">
+                            <button
+                              onClick={() => handleVoteClick(post)}
+                              disabled={userHasVoted || isVotingThis}
+                              className={`flex items-center gap-1.5 transition-colors ${userHasVoted ? "text-hive" : "hover:text-hive"}`}
+                            >
+                              {isVotingThis ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Heart size={16} className={userHasVoted ? "fill-hive" : ""} />
+                              )}
+                              <span className="font-semibold">{up}</span>
+                            </button>
+                            <Link to={`/@${post.author}/${post.permlink}#comments`} state={{ backgroundLocation: actualLocation }} className="flex items-center gap-1.5 hover:text-white transition-colors">
+                              <MessageCircle size={16} />
+                              <span className="font-semibold">{post.children}</span>
+                            </Link>
+                          </div>
+                          <div className="font-mono font-medium text-slate-400">
+                            {reward} {community}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 return (
                   <div
                     key={`${post.author}-${post.permlink}`}
@@ -842,13 +1462,15 @@ const Explorer: React.FC = () => {
                       <div className="relative h-48 bg-slate-800 overflow-hidden shrink-0">
                         {thumbnail ? (
                           <img
-                            src={`https://images.hive.blog/768x0/${thumbnail}`}
+                            src={`https://images.hive.blog/200x0/${thumbnail}`}
                             alt={post.title}
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             onError={(e) => {
                               (e.target as HTMLImageElement).src =
                                 "https://placehold.co/600x400/1e293b/475569?text=No+Image";
                             }}
+                            fetchPriority={index === 0 ? "high" : "auto"}
+                            loading={index === 0 ? "eager" : "lazy"}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center bg-slate-800 text-slate-600">
@@ -985,9 +1607,44 @@ const Explorer: React.FC = () => {
                         </div>
 
                         <div className="flex items-center gap-3">
+
+                        {user === "faireye" && (
+                          <div className="relative">
+                            <button
+                              onClick={(e) => { e.preventDefault(); setCuratingPost(curatingPost?.permlink === post.permlink ? null : post); }}
+                              className="text-xs font-bold text-hive border border-hive px-2 py-1 rounded hover:bg-hive hover:text-white transition-colors"
+                            >
+                              Curate
+                            </button>
+                            {curatingPost?.permlink === post.permlink && (
+                              <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 p-2 flex flex-col gap-1">
+                                {['highlight', 'entertainment', 'politics', 'sport', 'philosophy', 'crypto', 'economy'].map(flair => (
+                                  <button
+                                    key={flair}
+                                    onClick={async (e) => {
+                                      e.preventDefault();
+                                      const json = { author: post.author, permlink: post.permlink };
+                                      try {
+                                        await customJson(`news_${flair}`, json, `Curate ${flair}`);
+                                        setCuratingPost(null);
+                                        alert("Curated as " + flair);
+                                      } catch (err: any) {
+                                        alert("Failed: " + err);
+                                      }
+                                    }}
+                                    className="text-left px-2 py-1 text-xs hover:bg-slate-700 rounded text-slate-200 uppercase tracking-wider"
+                                  >
+                                    {flair}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                           {viewMode === "list" && (
                             <div
-                              className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 font-mono text-xs ${isPaid ? "text-slate-400 bg-slate-800" : "text-cent bg-cent/10"}`}
+                              className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 font-mono text-xs ${isPaid ? "text-slate-400 bg-slate-800" : (layoutMode === "journal" ? "text-white bg-slate-800" : "text-cent bg-cent/10")}`}
                             >
                               {reward} {community}
                             </div>
