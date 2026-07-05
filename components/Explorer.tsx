@@ -80,6 +80,14 @@ const JOURNAL_CATEGORIES = [
   { id: 'news_economy', label: 'Economy' },
 ];
 
+const getGradientPlaceholder = (seed: string) => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  const hue1 = Math.abs(hash) % 360;
+  const hue2 = (hue1 + 40) % 360;
+  return `linear-gradient(135deg, hsl(${hue1}, 40%, 15%), hsl(${hue2}, 40%, 10%))`;
+};
+
 const CATEGORY_THEMES: Record<string, {
   color: string;
   border: string;
@@ -1035,9 +1043,12 @@ const Explorer: React.FC = () => {
                            }}
                          />
                        ) : (
-                         <div className="w-full h-full flex items-center justify-center bg-slate-900 text-slate-700 border border-slate-800 rounded-2xl">
-                           <BookOpen size={64} strokeWidth={1} />
-                         </div>
+                           <div
+                              className="w-full h-full flex items-center justify-center border border-slate-800 rounded-2xl"
+                              style={{ background: getGradientPlaceholder(`${highlightPost.author}-${highlightPost.permlink}`) }}
+                            >
+                              <BookOpen size={64} strokeWidth={1} className="text-white/20" />
+                            </div>
                        )}
                        <div className="absolute top-4 left-4">
                          <span className="bg-red-600 text-white px-3 py-1 text-xs font-black uppercase tracking-wider rounded-md shadow-lg flex items-center gap-1.5 animate-pulse">
@@ -1214,8 +1225,11 @@ const Explorer: React.FC = () => {
                                 }}
                               />
                             ) : (
-                              <div className="w-full h-full flex items-center justify-center text-slate-700 bg-slate-950">
-                                <BookOpen size={36} strokeWidth={1} />
+                              <div
+                                className="w-full h-full flex items-center justify-center"
+                                style={{ background: getGradientPlaceholder(`${catPost.author}-${catPost.permlink}`) }}
+                              >
+                                <BookOpen size={36} strokeWidth={1} className="text-white/20" />
                               </div>
                             )}
                           </div>
@@ -1279,9 +1293,12 @@ const Explorer: React.FC = () => {
                                         }}
                                       />
                                     ) : (
-                                      <div className="w-full h-full flex items-center justify-center text-slate-700 bg-slate-900">
-                                        <BookOpen size={16} strokeWidth={1} />
-                                      </div>
+                                       <div
+                                          className="w-full h-full flex items-center justify-center"
+                                          style={{ background: getGradientPlaceholder(`${sub.author}-${sub.permlink}`) }}
+                                        >
+                                          <BookOpen size={16} strokeWidth={1} className="text-white/20" />
+                                        </div>
                                     )}
                                   </div>
 
@@ -1391,8 +1408,11 @@ const Explorer: React.FC = () => {
                             loading={index === 0 ? "eager" : "lazy"}
                           />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center bg-slate-900 border border-slate-800 text-slate-700">
-                             <BookOpen size={48} strokeWidth={1} />
+                          <div
+                            className="w-full h-full flex items-center justify-center border border-slate-800 rounded-xl"
+                            style={{ background: getGradientPlaceholder(`${post.author}-${post.permlink}`) }}
+                          >
+                            <BookOpen size={48} strokeWidth={1} className="text-white/20" />
                           </div>
                         )}
                         <div className="absolute top-4 left-4 flex gap-2">

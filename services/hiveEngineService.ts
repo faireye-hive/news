@@ -686,3 +686,26 @@ export const getAdminCuratedPosts = async (adminAccount: string = 'faireye'): Pr
     }
   }
 };
+
+export const getAccountDetails = async (username: string): Promise<any | null> => {
+  try {
+    const result = await hiveFetch("condenser_api.get_accounts", [[username]]);
+    if (result && result.length > 0) {
+      return result[0];
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching account details:", error);
+    return null;
+  }
+};
+
+export const getFollowCount = async (username: string): Promise<{ follower_count: number; following_count: number } | null> => {
+  try {
+    const result = await hiveFetch("condenser_api.get_follow_count", [username]);
+    return result || null;
+  } catch (error) {
+    console.error("Error fetching follow count:", error);
+    return null;
+  }
+};
