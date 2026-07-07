@@ -7,7 +7,7 @@ import {
 import { HivePost, TribeInfo } from "../types";
 import { communityConfig, bannedUsers } from "../config";
 import { sanitizeUrl } from "../utils/security";
-import { extractImage } from "../utils/image";
+import { extractImage, getProxiedImageUrl } from "../utils/image";
 import {
   MessageCircle,
   Heart,
@@ -80,7 +80,23 @@ const JOURNAL_CATEGORIES = [
   { id: 'news_economy', label: 'Economy' },
 ];
 
-const getGradientPlaceholder = (seed: string) => {
+const getGradientPlaceholder = (seed: string, categoryId?: string) => {
+  if (categoryId) {
+    const themeColors: Record<string, { hue1: number, hue2: number }> = {
+      news_highlight: { hue1: 345, hue2: 15 },    
+      news_entertainment: { hue1: 25, hue2: 45 }, 
+      news_politics: { hue1: 350, hue2: 10 },     
+      news_sport: { hue1: 140, hue2: 160 },       
+      news_philosophy: { hue1: 270, hue2: 290 },  
+      news_crypto: { hue1: 200, hue2: 220 },      
+      news_economy: { hue1: 210, hue2: 230 }      
+    };
+    const hues = themeColors[categoryId];
+    if (hues) {
+      return `linear-gradient(135deg, hsl(${hues.hue1}, 50%, 15%), hsl(${hues.hue2}, 50%, 10%))`;
+    }
+  }
+
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
   const hue1 = Math.abs(hash) % 360;
@@ -256,10 +272,15 @@ const Explorer: React.FC = () => {
       const withContent = await Promise.all(curations.map(async (c: any) => {
         let post = cache.find(p => p.author === c.author && p.permlink === c.permlink);
         if (!post) {
-          post = await getScotPost(c.author, c.permlink, community);
-        }
-        if (!post) {
-          post = await getPostContent(c.author, c.permlink);
+          const [scot, hive] = await Promise.all([
+             getScotPost(c.author, c.permlink, community),
+             getPostContent(c.author, c.permlink)
+          ]);
+          if (hive) {
+             post = { ...hive, ...scot, json_metadata: hive.json_metadata, body: hive.body, active_votes: scot?.active_votes || hive.active_votes };
+          } else {
+             post = scot;
+          }
         }
         return { ...c, post };
       }));
@@ -492,7 +513,8 @@ const Explorer: React.FC = () => {
         return val.toFixed(precision);
       }
 
-      // 3. Dynamic Calculation using rshares as a fallback
+
+      // 4. Dynamic Calculation using rshares as a fallback
       if (tribeInfo && post.vote_rshares != null) {
         const rshares = Number(post.vote_rshares);
         const exponent =
@@ -1035,7 +1057,7 @@ const Explorer: React.FC = () => {
                      <div className="w-full lg:w-3/5 h-[320px] sm:h-[420px] lg:h-[450px] rounded-2xl overflow-hidden bg-slate-900 relative shadow-inner shrink-0">
                        {thumbnail ? (
                          <img
-                           src={`https://images.hive.blog/800x0/${thumbnail}`}
+                           src={getProxiedImageUrl(thumbnail, 800) || ""}
                            alt={highlightPost.title}
                            className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-700 ease-out"
                            onError={(e) => {
@@ -1045,7 +1067,7 @@ const Explorer: React.FC = () => {
                        ) : (
                            <div
                               className="w-full h-full flex items-center justify-center border border-slate-800 rounded-2xl"
-                              style={{ background: getGradientPlaceholder(`${highlightPost.author}-${highlightPost.permlink}`) }}
+                              style={{ background: getGradientPlaceholder(`${highlightPost.author}-${highlightPost.permlink}`, 'news_highlight') }}
                             >
                               <BookOpen size={64} strokeWidth={1} className="text-white/20" />
                             </div>
@@ -1217,7 +1239,7 @@ const Explorer: React.FC = () => {
                           <div className="h-48 bg-slate-950 shrink-0 relative overflow-hidden rounded-2xl mb-4 border border-slate-700/50">
                             {thumbnail ? (
                               <img
-                                src={`https://images.hive.blog/400x0/${thumbnail}`}
+                                src={getProxiedImageUrl(thumbnail, 400) || ""}
                                 alt={catPost.title}
                                 className="w-full h-full object-cover group-hover/card:scale-102 transition-all duration-500"
                                 onError={(e) => {
@@ -1227,7 +1249,7 @@ const Explorer: React.FC = () => {
                             ) : (
                               <div
                                 className="w-full h-full flex items-center justify-center"
-                                style={{ background: getGradientPlaceholder(`${catPost.author}-${catPost.permlink}`) }}
+                                style={{ background: getGradientPlaceholder(`${catPost.author}-${catPost.permlink}`, cat.id) }}
                               >
                                 <BookOpen size={36} strokeWidth={1} className="text-white/20" />
                               </div>
@@ -1285,7 +1307,7 @@ const Explorer: React.FC = () => {
                                   <div className="w-16 h-12 bg-slate-950 rounded-lg overflow-hidden shrink-0 relative border border-slate-700/50">
                                     {subThumbnail ? (
                                       <img
-                                        src={`https://images.hive.blog/120x120/${subThumbnail}`}
+                                        src={getProxiedImageUrl(subThumbnail, 120, 120) || ""}
                                         alt={sub.title}
                                         className="w-full h-full object-cover group-hover/item:scale-105 transition-all duration-300"
                                         onError={(e) => {
@@ -1295,7 +1317,7 @@ const Explorer: React.FC = () => {
                                     ) : (
                                        <div
                                           className="w-full h-full flex items-center justify-center"
-                                          style={{ background: getGradientPlaceholder(`${sub.author}-${sub.permlink}`) }}
+                                          style={{ background: getGradientPlaceholder(`${sub.author}-${sub.permlink}`, cat.id) }}
                                         >
                                           <BookOpen size={16} strokeWidth={1} className="text-white/20" />
                                         </div>
@@ -1398,7 +1420,7 @@ const Explorer: React.FC = () => {
                       <div className={`shrink-0 ${isFeatured ? "w-full lg:w-2/3 h-[400px] lg:h-[500px]" : "w-full h-48 sm:h-56"} rounded-xl overflow-hidden bg-slate-900 relative`}>
                         {thumbnail ? (
                           <img
-                            src={`https://images.hive.blog/${isFeatured ? '800x0' : '400x0'}/${thumbnail}`}
+                            src={getProxiedImageUrl(thumbnail, isFeatured ? 800 : 400) || ""}
                             alt={post.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                             onError={(e) => {
@@ -1482,7 +1504,7 @@ const Explorer: React.FC = () => {
                       <div className="relative h-48 bg-slate-800 overflow-hidden shrink-0">
                         {thumbnail ? (
                           <img
-                            src={`https://images.hive.blog/200x0/${thumbnail}`}
+                            src={getProxiedImageUrl(thumbnail, 200) || ""}
                             alt={post.title}
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             onError={(e) => {

@@ -72,6 +72,14 @@ const CommentItem: React.FC<{
             return `<img src="${finalUrl}" alt="${alt}" loading="lazy" />`;
           },
         );
+        // Depois da conversão de imagens, antes do marked.parse:
+        bodyToParse = bodyToParse.replace(
+          /(?<!!)\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g,
+          (match, text, url) => {
+            const safeUrl = url.replace(/"/g, "&quot;");
+            return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+          }
+        );
         const rawHtml = await marked.parse(bodyToParse);
         const cleanHtml = sanitizePostHtml(rawHtml);
         setHtml(cleanHtml);
@@ -114,7 +122,7 @@ const CommentItem: React.FC<{
         return val.toFixed(precision);
       }
 
-      // 3. Dynamic Calculation as fallback
+      // 4. Dynamic Calculation as fallback
       if (tribeInfo && p.vote_rshares != null) {
         const rshares = Number(p.vote_rshares);
         const exponent = Number(tribeInfo.author_curve_exponent || 1);
@@ -529,6 +537,15 @@ const SinglePost: React.FC = () => {
             }
             return `<img src="${finalUrl}" alt="${alt}" loading="lazy" />`;
           },
+        );
+
+        // Depois da conversão de imagens, antes do marked.parse:
+        bodyToParse = bodyToParse.replace(
+          /(?<!!)\[([^\]]*)\]\((https?:\/\/[^\s)]+)\)/g,
+          (match, text, url) => {
+            const safeUrl = url.replace(/"/g, "&quot;");
+            return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${text}</a>`;
+          }
         );
 
         const rawHtml = await marked.parse(bodyToParse);
