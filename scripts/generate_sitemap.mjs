@@ -6,7 +6,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // URL do seu projeto no GitHub Pages ou Cloudflare Pages
-const SITE_URL = process.env.SITE_URL || 'https://faireye-hive.github.io/news';
+let rawSiteUrl = process.env.SITE_URL || process.env.CF_PAGES_URL || 'https://faireye-hive.github.io/news';
+// Remove barra invertida final se houver para evitar URLs com barras duplas
+const SITE_URL = rawSiteUrl.replace(/\/$/, '');
 const TOKEN = 'NEWS';
 const LIMIT = 200;
 
