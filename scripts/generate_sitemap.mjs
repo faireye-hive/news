@@ -5,8 +5,8 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// URL do seu projeto no GitHub Pages
-const SITE_URL = 'https://faireye-hive.github.io/news';
+// URL do seu projeto no GitHub Pages ou Cloudflare Pages
+const SITE_URL = process.env.SITE_URL || 'https://faireye-hive.github.io/news';
 const TOKEN = 'NEWS';
 const LIMIT = 200;
 
@@ -116,6 +116,16 @@ async function generateSitemap() {
 
     console.log(`✅ Sitemap gerado com ${totalPosts} posts.`);
     console.log(`📄 ${filePath}`);
+
+    // Cria/atualiza o robots.txt apontando para o sitemap correto
+    const robotsTxt = `User-agent: *
+Allow: /
+
+Sitemap: ${SITE_URL}/sitemap.xml
+`;
+    const robotsPath = path.resolve(__dirname, '..', 'public', 'robots.txt');
+    fs.writeFileSync(robotsPath, robotsTxt, 'utf8');
+    console.log(`✅ robots.txt atualizado em: ${robotsPath}`);
 
   } catch (err) {
     console.error('Erro ao gerar sitemap:', err);
