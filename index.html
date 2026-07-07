@@ -4,6 +4,18 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hive Community Explorer</title>
+    <script>
+      // Single Page Apps for GitHub Pages URL restoration
+      (function() {
+        var redirect = sessionStorage.getItem('spa_redirect');
+        if (redirect) {
+          sessionStorage.removeItem('spa_redirect');
+          if (redirect !== window.location.pathname + window.location.search + window.location.hash) {
+            window.history.replaceState(null, null, redirect);
+          }
+        }
+      })();
+    </script>
     <!-- Added typography plugin -->
     <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
     <script>

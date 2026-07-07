@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  HashRouter as Router,
+  BrowserRouter as Router,
   Routes,
   Route,
   Link,
@@ -428,8 +428,11 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  const isGhPages = window.location.hostname.endsWith(".github.io") || window.location.pathname.startsWith("/news");
+  const basename = isGhPages ? "/news" : "/";
+
   return (
-    <Router>
+    <Router basename={basename}>
       <AuthProvider>
         <CommunityProvider>
           <LanguageProvider>

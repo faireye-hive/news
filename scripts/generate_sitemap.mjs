@@ -26,7 +26,7 @@ async function generateSitemap() {
 
     for (const page of staticPages) {
       xml += `  <url>
-    <loc>${SITE_URL}/#${page}</loc>
+    <loc>${SITE_URL}${page}</loc>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>\n`;
@@ -74,7 +74,7 @@ async function generateSitemap() {
         totalPosts++;
 
         xml += `  <url>
-    <loc>${SITE_URL}/#/@${post.author}/${post.permlink}</loc>`;
+    <loc>${SITE_URL}/@${post.author}/${post.permlink}</loc>`;
 
         if (post.created) {
           xml += `

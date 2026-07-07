@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>NEWS Explorer</title>
+  <script>
+    // GitHub Pages SPA redirect hack
+    var path = window.location.pathname;
+    var search = window.location.search;
+    var hash = window.location.hash;
+    
+    // Store original path in sessionStorage
+    sessionStorage.setItem('spa_redirect', path + search + hash);
+    
+    // Redirect to index.html (root of the app)
+    var repo = '/news';
+    if (path.startsWith(repo)) {
+      window.location.replace(repo + '/');
+    } else {
+      window.location.replace('/');
+    }
+  </script>
+</head>
+<body>
+  Redirecting to NEWS Explorer...
+</body>
+</html>
