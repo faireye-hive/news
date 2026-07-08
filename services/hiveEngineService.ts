@@ -373,7 +373,7 @@ export const getHivePosts = async (
   }
 };
 
-export const getScotPost = async (author: string, permlink: string, token: string = 'BYTE'): Promise<HivePost | null> => {
+export const getScotPost = async (author: string, permlink: string, token: string = 'NEWS'): Promise<HivePost | null> => {
   try {
     const rawData = await scotFetch(`/@${author}/${permlink}?token=${token}`);
     
@@ -383,22 +383,6 @@ export const getScotPost = async (author: string, permlink: string, token: strin
     }
     
     if (data && data.author) {
-       if (!data.vote_rshares || Number(data.vote_rshares) === 0) {
-          try {
-             const feedData = await scotFetch(`/get_discussions_by_author?token=${token}&author=${author}&limit=50`);
-             if (Array.isArray(feedData)) {
-                const found = feedData.find((p: any) => p.permlink === permlink);
-                if (found) {
-                    console.log("Scotbot fallback: Found updated post data in author feed", found);
-                    found.author = found.author || author;
-                    found.permlink = found.permlink || permlink;
-                    return found;
-                }
-             }
-          } catch(e) {
-            console.warn("Scotbot fallback fetch failed", e);
-          }
-       }
        data.author = data.author || author;
        data.permlink = data.permlink || permlink;
        return data;
