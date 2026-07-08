@@ -5,8 +5,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// URL do seu projeto no GitHub Pages ou Cloudflare Pages
-let rawSiteUrl = process.env.SITE_URL || process.env.CF_PAGES_URL || 'https://faireye-hive.github.io/news';
+// URL do seu projeto no GitHub Pages ou Cloudflare Pages com fallback inteligente baseado no ambiente de build
+const isGhActions = process.env.GITHUB_ACTIONS === 'true';
+const defaultUrl = isGhActions ? 'https://faireye-hive.github.io/news' : 'https://news.faireye.workers.dev';
+
+let rawSiteUrl = process.env.SITE_URL || process.env.CF_PAGES_URL || defaultUrl;
 // Remove barra invertida final se houver para evitar URLs com barras duplas
 const SITE_URL = rawSiteUrl.replace(/\/$/, '');
 const TOKEN = 'NEWS';

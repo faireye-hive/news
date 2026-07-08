@@ -4,8 +4,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    const isGhPages = env.SITE_URL?.includes('github.io') || process.env.GITHUB_ACTIONS === 'true';
+    const base = isGhPages ? '/news/' : '/';
     return {
-      base: './',
+      base,
       server: {
         port: 3000,
         host: '0.0.0.0',
