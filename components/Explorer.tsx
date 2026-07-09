@@ -38,7 +38,7 @@ import {
   Hash,
   Layers,
   Newspaper,
-  BookOpen
+  BookOpen, VolumeX, Volume2, MoreVertical
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useCommunity } from "../contexts/CommunityContext";
@@ -239,6 +239,7 @@ const Explorer: React.FC = () => {
   const [cacheList, setCacheList] = useState<HivePost[]>([]);
   const [loadingCurations, setLoadingCurations] = useState(false);
   const [curatingPost, setCuratingPost] = useState<HivePost | null>(null);
+  const [openAdminMenu, setOpenAdminMenu] = useState<string | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState<
     "collapsed" | "expanded"
   >(() => {
@@ -290,6 +291,41 @@ const Explorer: React.FC = () => {
       console.error("Error fetching curations:", error);
     } finally {
       setLoadingCurations(false);
+    }
+  };
+
+  const [mutingPostPermlink, setMutingPostPermlink] = useState<string | null>(null);
+
+  const handlePostMute = async (post: HivePost, mute: boolean) => {
+    if (!user) return;
+    try {
+      setMutingPostPermlink(post.permlink);
+      const payload = {
+        contractName: 'comments',
+        contractAction: 'setPostMute',
+        contractPayload: {
+          rewardPoolId: 55,
+          authorperm: `@${post.author}/${post.permlink}`,
+          mute: mute
+        }
+      };
+
+      const response = await customJson(
+        'ssc-mainnet-hive',
+        payload,
+        `${mute ? 'Mute' : 'Unmute'} Post`,
+        'Active'
+      );
+
+      if (response.success) {
+        alert(`Successfully ${mute ? 'muted' : 'unmuted'} post.`);
+      } else {
+        alert(response.message || 'Failed to broadcast transaction.');
+      }
+    } catch (err: any) {
+      alert(err.message || 'An unexpected error occurred.');
+    } finally {
+      setMutingPostPermlink(null);
     }
   };
 
@@ -936,7 +972,7 @@ const Explorer: React.FC = () => {
                 </div>
               </>
             ) : (
-              <div className="flex flex-col items-center gap-4 mt-4">
+              <div className="flex flex-col items-center gap-2 mt-4">
                 {/* Collapsed icons */}
                 <button
                   onClick={() => setSearchParams({})}
@@ -1121,35 +1157,91 @@ const Explorer: React.FC = () => {
                            </Link>
                          </div>
                          
-                         <div className="flex items-center gap-3">
+                         <div className="flex items-center gap-1.5 sm:gap-0">
                            <div className="font-mono font-bold text-white bg-slate-800 border border-slate-700 px-2 py-0.5 rounded text-xs">
                              {reward} {community}
                            </div>
-                           
-                           {user === "faireye" && (
+                                                    {user === "faireye" && (
                              <div className="relative">
                                <button
-                                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCuratingPost(curatingPost?.permlink === highlightPost.permlink ? null : highlightPost); }}
-                                 className="text-xs font-bold text-hive border border-hive px-2.5 py-1 rounded hover:bg-hive hover:text-white transition-all flex items-center gap-1 bg-slate-900/50"
+                                 onClick={(e) => {
+                                   e.preventDefault();
+                                   e.stopPropagation();
+                                   setOpenAdminMenu(openAdminMenu === highlightPost.permlink ? null : highlightPost.permlink);
+                                   setCuratingPost(null);
+                                 }}
+                                 className="text-slate-400 hover:text-white p-1 transition-colors rounded-full hover:bg-slate-800/80"
+                                 title="Opções de Admin"
                                >
-                                 Curate
+                                 <MoreVertical size={16} />
                                </button>
-                               {curatingPost?.permlink === highlightPost.permlink && (
-                                 <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 p-2 flex flex-col gap-1 animate-fade-in">
-                                   {['highlight', 'entertainment', 'politics', 'sport', 'philosophy', 'crypto', 'economy'].map(flair => (
-                                     <button
-                                       key={flair}
-                                       onClick={async (e) => {
-                                         e.preventDefault();
-                                         e.stopPropagation();
-                                         await handleCurate(highlightPost, flair);
-                                         setCuratingPost(null);
-                                       }}
-                                       className="text-left px-2 py-1.5 text-xs hover:bg-slate-800 rounded text-slate-200 uppercase tracking-wider font-semibold"
-                                     >
-                                       {flair}
-                                     </button>
-                                   ))}
+                               {openAdminMenu === highlightPost.permlink && (
+                                 <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 p-2 flex flex-col gap-1.5 animate-fade-in">
+                                   <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/60">
+                                     Ações de Admin
+                                   </div>
+                                   
+                                   <button
+                                     onClick={(e) => {
+                                       e.preventDefault();
+                                       e.stopPropagation();
+                                       setCuratingPost(curatingPost?.permlink === highlightPost.permlink ? null : highlightPost);
+                                     }}
+                                     className="flex items-center justify-between w-full text-left px-2 py-1.5 text-xs hover:bg-slate-800 text-slate-200 rounded transition-colors"
+                                   >
+                                     <span>Curar Post</span>
+                                     <Star size={12} className={curatingPost?.permlink === highlightPost.permlink ? "fill-hive text-hive" : "text-slate-400"} />
+                                   </button>
+
+                                   {curatingPost?.permlink === highlightPost.permlink && (
+                                     <div className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-1.5 flex flex-col gap-1 max-h-40 overflow-y-auto">
+                                       {['highlight', 'entertainment', 'politics', 'sport', 'philosophy', 'crypto', 'economy'].map(flair => (
+                                         <button
+                                           key={flair}
+                                           onClick={async (e) => {
+                                             e.preventDefault();
+                                             e.stopPropagation();
+                                             await handleCurate(highlightPost, flair);
+                                             setCuratingPost(null);
+                                             setOpenAdminMenu(null);
+                                           }}
+                                           className="text-left px-2 py-1 text-[10px] hover:bg-slate-800 rounded text-slate-300 uppercase tracking-wider font-semibold"
+                                         >
+                                           {flair}
+                                         </button>
+                                       ))}
+                                     </div>
+                                   )}
+
+                                   <div className="border-t border-slate-800/80 my-0.5"></div>
+
+                                   <button
+                                     onClick={(e) => {
+                                       e.preventDefault();
+                                       e.stopPropagation();
+                                       handlePostMute(highlightPost, true);
+                                       setOpenAdminMenu(null);
+                                     }}
+                                     disabled={mutingPostPermlink === highlightPost.permlink}
+                                     className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-xs hover:bg-red-950/30 text-red-400 hover:text-red-300 rounded transition-colors disabled:opacity-50"
+                                   >
+                                     <VolumeX size={14} />
+                                     <span>Mutar Post</span>
+                                   </button>
+
+                                   <button
+                                     onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        handlePostMute(highlightPost, false);
+                                        setOpenAdminMenu(null);
+                                     }}
+                                     disabled={mutingPostPermlink === highlightPost.permlink}
+                                     className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-xs hover:bg-green-950/30 text-green-400 hover:text-green-300 rounded transition-colors disabled:opacity-50"
+                                   >
+                                     <Volume2 size={14} />
+                                     <span>Desmutar Post</span>
+                                   </button>
                                  </div>
                                )}
                              </div>
@@ -1271,7 +1363,7 @@ const Explorer: React.FC = () => {
                               <Link to={`/profile/${catPost.author}`} className="font-mono text-xs text-slate-300 hover:text-hive hover:underline transition-colors font-semibold">
                                 @{catPost.author}
                               </Link>
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1.5 sm:gap-3">
                                 <button
                                   onClick={() => handleVoteClick(catPost)}
                                   disabled={userHasVoted || isVotingThis}
@@ -1498,10 +1590,10 @@ const Explorer: React.FC = () => {
                 return (
                   <div
                     key={`${post.author}-${post.permlink}`}
-                    className={`group bg-card rounded-2xl overflow-hidden border border-slate-700/50 hover:border-slate-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-cent/5 flex ${viewMode === "list" ? "flex-col sm:flex-row items-stretch" : "flex-col h-full"}`}
+                    className={`group bg-card rounded-2xl border border-slate-700/50 hover:border-slate-500/50 transition-all duration-300 hover:shadow-xl hover:shadow-cent/5 flex ${viewMode === "list" ? "flex-col sm:flex-row items-stretch" : "flex-col h-full"}`}
                   >
                     {viewMode === "grid" && (
-                      <div className="relative h-48 bg-slate-800 overflow-hidden shrink-0">
+                      <div className="relative h-48 bg-slate-800 overflow-hidden rounded-t-2xl shrink-0">
                         {thumbnail ? (
                           <img
                             src={getProxiedImageUrl(thumbnail, 200) || ""}
@@ -1537,7 +1629,7 @@ const Explorer: React.FC = () => {
                     <div
                       className={`p-5 flex flex-col flex-1 ${viewMode === "list" ? "justify-between" : ""}`}
                     >
-                      <div className="flex items-center gap-3 mb-3">
+                      <div className="flex items-center gap-1.5 sm:gap-3 mb-3">
                         <Link
                           to={`/profile/${post.author}`}
                           className="shrink-0"
@@ -1585,9 +1677,9 @@ const Explorer: React.FC = () => {
                       </Link>
 
                       <div
-                        className={`flex flex-wrap items-center justify-between gap-4 mt-4 pt-4 border-t border-slate-700/50 text-slate-400 text-xs`}
+                        className={`flex flex-wrap items-center justify-between gap-2 mt-4 pt-4 border-t border-slate-700/50 text-slate-400 text-xs`}
                       >
-                        <div className="flex gap-4 items-center">
+                        <div className="flex gap-2 sm:gap-3 items-center">
                           <div className="flex items-center gap-1.5 transition-colors">
                             <button
                               onClick={() => handleVoteClick(post)}
@@ -1648,37 +1740,95 @@ const Explorer: React.FC = () => {
                           </Link>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1.5 sm:gap-3">
 
                         {user === "faireye" && (
                           <div className="relative">
                             <button
-                              onClick={(e) => { e.preventDefault(); setCuratingPost(curatingPost?.permlink === post.permlink ? null : post); }}
-                              className="text-xs font-bold text-hive border border-hive px-2 py-1 rounded hover:bg-hive hover:text-white transition-colors"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setOpenAdminMenu(openAdminMenu === post.permlink ? null : post.permlink);
+                                setCuratingPost(null);
+                              }}
+                              className="text-slate-400 hover:text-white p-1 transition-colors rounded-full hover:bg-slate-800/80"
+                              title="Opções de Admin"
                             >
-                              Curate
+                              <MoreVertical size={16} />
                             </button>
-                            {curatingPost?.permlink === post.permlink && (
-                              <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 p-2 flex flex-col gap-1">
-                                {['highlight', 'entertainment', 'politics', 'sport', 'philosophy', 'crypto', 'economy'].map(flair => (
-                                  <button
-                                    key={flair}
-                                    onClick={async (e) => {
-                                      e.preventDefault();
-                                      const json = { author: post.author, permlink: post.permlink };
-                                      try {
-                                        await customJson(`news_${flair}`, json, `Curate ${flair}`);
-                                        setCuratingPost(null);
-                                        alert("Curated as " + flair);
-                                      } catch (err: any) {
-                                        alert("Failed: " + err);
-                                      }
-                                    }}
-                                    className="text-left px-2 py-1 text-xs hover:bg-slate-700 rounded text-slate-200 uppercase tracking-wider"
-                                  >
-                                    {flair}
-                                  </button>
-                                ))}
+                            {openAdminMenu === post.permlink && (
+                              <div className="absolute bottom-full right-0 mb-2 w-48 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-50 p-2 flex flex-col gap-1.5 animate-fade-in text-slate-200">
+                                <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-800/60">
+                                  Ações de Admin
+                                </div>
+                                
+                                <button
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setCuratingPost(curatingPost?.permlink === post.permlink ? null : post);
+                                  }}
+                                  className="flex items-center justify-between w-full text-left px-2 py-1.5 text-xs hover:bg-slate-800 text-slate-200 rounded transition-colors"
+                                >
+                                  <span>Curar Post</span>
+                                  <Star size={12} className={curatingPost?.permlink === post.permlink ? "fill-hive text-hive" : "text-slate-400"} />
+                                </button>
+
+                                {curatingPost?.permlink === post.permlink && (
+                                  <div className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-1.5 flex flex-col gap-1 max-h-40 overflow-y-auto">
+                                    {['highlight', 'entertainment', 'politics', 'sport', 'philosophy', 'crypto', 'economy'].map(flair => (
+                                      <button
+                                        key={flair}
+                                        onClick={async (e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          const json = { author: post.author, permlink: post.permlink };
+                                          try {
+                                            await customJson(`news_${flair}`, json, `Curate ${flair}`);
+                                            setCuratingPost(null);
+                                            setOpenAdminMenu(null);
+                                            alert("Curated as " + flair);
+                                          } catch (err: any) {
+                                            alert("Failed: " + err);
+                                          }
+                                        }}
+                                        className="text-left px-2 py-1 text-[10px] hover:bg-slate-800 rounded text-slate-300 uppercase tracking-wider font-semibold"
+                                      >
+                                        {flair}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <div className="border-t border-slate-800/80 my-0.5"></div>
+
+                                <button
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    await handlePostMute(post, true);
+                                    setOpenAdminMenu(null);
+                                  }}
+                                  disabled={mutingPostPermlink === post.permlink}
+                                  className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-xs hover:bg-red-950/30 text-red-400 hover:text-red-300 rounded transition-colors disabled:opacity-50"
+                                >
+                                  <VolumeX size={14} />
+                                  <span>Mutar Post</span>
+                                </button>
+
+                                <button
+                                  onClick={async (e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    await handlePostMute(post, false);
+                                    setOpenAdminMenu(null);
+                                  }}
+                                  disabled={mutingPostPermlink === post.permlink}
+                                  className="flex items-center gap-2 w-full text-left px-2 py-1.5 text-xs hover:bg-green-950/30 text-green-400 hover:text-green-300 rounded transition-colors disabled:opacity-50"
+                                >
+                                  <Volume2 size={14} />
+                                  <span>Desmutar Post</span>
+                                </button>
                               </div>
                             )}
                           </div>

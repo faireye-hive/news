@@ -32,7 +32,9 @@ import {
   Droplets,
   MessageSquare,
   Globe2,
+  Shield,
 } from "lucide-react";
+import AdminPanel from "./components/AdminPanel";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { CommunityProvider, useCommunity } from "./contexts/CommunityContext";
 import {
@@ -187,6 +189,15 @@ const LoginButton: React.FC = () => {
               >
                 <User size={16} /> {t("nav.hiddenUsers")}
               </Link>
+              {user === 'faireye' && (
+                <Link
+                  to="/admin"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-center gap-2 px-4 py-3 text-blue-400 hover:bg-slate-700 hover:text-blue-300 transition-colors"
+                >
+                  <Shield size={16} /> Admin Panel
+                </Link>
+              )}
               <div className="border-t border-slate-700 my-1"></div>
               <button
                 onClick={() => {
@@ -399,6 +410,7 @@ const AppContent: React.FC = () => {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/profile/:username?" element={<Profile />} />
           <Route path="/hidden-users" element={<HiddenUsers />} />
+          <Route path="/admin" element={<AdminPanel />} />
           <Route path="/create-post" element={<CreatePost />} />
           <Route path="/post/:author/:permlink" element={<SinglePost />} />
           <Route path="/:author/:permlink" element={<SinglePost />} />
