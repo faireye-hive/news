@@ -28,7 +28,7 @@ const Chat: React.FC = () => {
 
   const fetchMessages = async (startBlock?: number) => {
     try {
-      const url = `https://hafsql-api.mahdiyari.info/operations/custom_json/${customId}?limit=50${startBlock ? `&start=${startBlock}` : ''}`;
+      const url = `https://rpc.mahdiyari.info/hafsql/operations/custom_json/${customId}?limit=50${startBlock ? `&start=${startBlock}` : ''}`;
       const response = await fetch(url);
       if (!response.ok) throw new Error('Failed to fetch messages');
       

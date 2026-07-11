@@ -677,7 +677,7 @@ export const getAdminCuratedPosts = async (
 
       const promises = ids.map(async (id) => {
         const res = await fetch(
-          `https://hafsql-api.mahdiyari.info/operations/custom_json/${id}`,
+          `https://rpc.mahdiyari.info/hafsql/operations/custom_json/${id}`,
         );
 
         if (!res.ok) {
