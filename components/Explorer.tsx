@@ -290,7 +290,24 @@ const Explorer: React.FC = () => {
     setLoadingCurations(true);
     try {
       // 1. Fetch 200 latest discussions from SCOT (Cache)
-      const cache = await getHivePosts(community, 'created', 200);
+      let cache = await getHivePosts(community, 'created', 200);
+      
+      // Load fallback discussions to avoid individual fetches for older curated posts
+      try {
+        const fallbackRes = await fetch('./fallback_discussions.json');
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          if (Array.isArray(fallbackData)) {
+            // Append fallback data to cache, avoiding duplicates
+            const cacheKeys = new Set(cache.map(p => `${p.author}/${p.permlink}`));
+            const uniqueFallback = fallbackData.filter(p => !cacheKeys.has(`${p.author}/${p.permlink}`));
+            cache = [...cache, ...uniqueFallback];
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load fallback for curations", err);
+      }
+
       setCacheList(cache);
 
       // 2. Fetch admin curation list
