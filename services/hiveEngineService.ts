@@ -8,6 +8,8 @@ const HIVE_ENGINE_RPC_NODES = [
   "https://ha.herpc.dtools.dev/contracts",
   "https://herpc.dtools.dev/contracts",
   "https://enginerpc.com/contracts",
+  "https://herpc.actifit.io/contracts",
+  "https://he.c0ff33a.uk/contracts",
 ];
 const SCOT_API_NODES = communityConfig.useLegacyScot ? [
   "https://scot-api.hive-engine.com"
@@ -16,10 +18,11 @@ const SCOT_API_NODES = communityConfig.useLegacyScot ? [
 ];
 const HIVE_RPC_NODES = [
   "https://api.hive.blog",
-  "https://rpc.ecency.com",
   "https://api.deathwing.me",
-  "https://anyx.io",
-  "https://rpc.ausbit.dev"
+  "https://api.openhive.network",
+  "https://api.c0ff33a.uk",
+  "https://hive.atexoras.com:2096",
+  "https://hiveapi.actifit.io",
 ];
 
 const apiCache = new Map<string, { data: any, timestamp: number }>();
@@ -65,7 +68,9 @@ const rpcCall = async <T,>(contract: string, table: string, query: Record<string
   }
 
   const fetchPromise = (async () => {
-    for (const node of HIVE_ENGINE_RPC_NODES) {
+    // Shuffle nodes to load balance and avoid hitting the first one repeatedly
+    const shuffledNodes = [...HIVE_ENGINE_RPC_NODES].sort(() => 0.5 - Math.random());
+    for (const node of shuffledNodes) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -192,7 +197,9 @@ export const scotFetch = async (endpoint: string, ttl = CACHE_TTL_DEFAULT): Prom
   if (inFlight.has(cacheKey)) return inFlight.get(cacheKey)!;
 
   const fetchPromise = (async () => {
-    for (const node of SCOT_API_NODES) {
+    // Shuffle nodes to load balance and avoid hitting the first one repeatedly
+    const shuffledNodes = [...SCOT_API_NODES].sort(() => 0.5 - Math.random());
+    for (const node of shuffledNodes) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
@@ -410,7 +417,9 @@ const hiveFetch = async (method: string, params: any, ttl = CACHE_TTL_DEFAULT): 
   };
 
   const fetchPromise = (async () => {
-    for (const node of HIVE_RPC_NODES) {
+    // Shuffle nodes to load balance and avoid hitting the first one repeatedly
+    const shuffledNodes = [...HIVE_RPC_NODES].sort(() => 0.5 - Math.random());
+    for (const node of shuffledNodes) {
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 6000);
@@ -602,82 +611,124 @@ export const getVotingPower = async (username: string, symbol: string = 'BYTE') 
   }
 };
 
-export const getAdminCuratedPosts = async (adminAccount: string = 'faireye'): Promise<any> => {
+export const getAdminCuratedPosts = async (
+  adminAccount: string = "faireye",
+): Promise<any> => {
   try {
-    const ids = ['news_highlight', 'news_entertainment', 'news_politics', 'news_sport', 'news_philosophy', 'news_crypto', 'news_economy'];
-    const promises = ids.map(async (id) => {
+    const url = `https://api.hive.blog/hafah-api/accounts/${adminAccount}/operations?transacting-account-name=${adminAccount}&participation-mode=include&operation-types=18&page-size=100&data-size-limit=200000`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.operations_result) return [];
+
+    const curations = [];
+
+    for (const item of data.operations_result) {
+      if (item.op?.type !== "custom_json_operation") continue;
+
+      const val = item.op.value;
+
+      if (!val?.id?.startsWith("news_")) continue;
+
       try {
-        const res = await fetch(`https://hafsql-api.mahdiyari.info/operations/custom_json/${id}`);
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const signers = [
+          ...(val.required_auths || []),
+          ...(val.required_posting_auths || []),
+        ];
+
+        if (!signers.includes(adminAccount)) continue;
+
+        const json = JSON.parse(val.json);
+
+        if (json.author && json.permlink) {
+          curations.push({
+            id: val.id,
+            author: json.author,
+            permlink: json.permlink,
+            date: item.timestamp,
+          });
+        }
+      } catch (e) {}
+    }
+
+    return curations;
+  } catch (error) {
+    console.error(
+      "Error fetching admin curations from HAFAH, using HAFSQL fallback:",
+      error,
+    );
+
+    try {
+      const ids = [
+        "news_highlight",
+        "news_entertainment",
+        "news_politics",
+        "news_sport",
+        "news_philosophy",
+        "news_crypto",
+        "news_economy",
+      ];
+
+      const promises = ids.map(async (id) => {
+        const res = await fetch(
+          `https://hafsql-api.mahdiyari.info/operations/custom_json/${id}`,
+        );
+
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+
         const arr = await res.json();
+
         if (!Array.isArray(arr)) return [];
 
         const mapped = [];
-        for (const item of arr) {
-          const signers = [...(item.required_auths || []), ...(item.required_posting_auths || [])];
-          if (signers.includes(adminAccount)) {
-            try {
-              const jsonVal = typeof item.json === 'string' ? JSON.parse(item.json) : item.json;
-              if (jsonVal && jsonVal.author && jsonVal.permlink) {
-                mapped.push({
-                  id: id,
-                  author: jsonVal.author,
-                  permlink: jsonVal.permlink,
-                  date: item.timestamp
-                });
-              }
-            } catch (e) {}
-          }
-        }
-        return mapped;
-      } catch (err) {
-        console.error(`Error fetching from hafsql for ${id}:`, err);
-        throw err; // propagate so Promise.all rejects and we fall back
-      }
-    });
-    const results = await Promise.all(promises);
-    return results.flat();
-  } catch (error) {
-    console.error("Error fetching admin curations from hafsql-api, using fallback:", error);
-    try {
-      const url = `https://api.hive.blog/hafah-api/accounts/${adminAccount}/operations?transacting-account-name=${adminAccount}&participation-mode=include&operation-types=18&page-size=100&data-size-limit=200000`;
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      if (!data.operations_result) return [];
 
-      const curations = [];
-      for (const item of data.operations_result) {
-        if (item.op && item.op.type === 'custom_json_operation') {
-          const val = item.op.value;
-          if (val && val.id && val.id.startsWith('news_')) {
-            try {
-              const signers = [...(val.required_auths || []), ...(val.required_posting_auths || [])];
-              if (signers.includes(adminAccount)) {
-                const json = JSON.parse(val.json);
-                if (json.author && json.permlink) {
-                  curations.push({
-                    id: val.id,
-                    author: json.author,
-                    permlink: json.permlink,
-                    date: item.timestamp
-                  });
-                }
-              }
-            } catch (e) {}
-          }
+        for (const item of arr) {
+          const signers = [
+            ...(item.required_auths || []),
+            ...(item.required_posting_auths || []),
+          ];
+
+          if (!signers.includes(adminAccount)) continue;
+
+          try {
+            const jsonVal =
+              typeof item.json === "string"
+                ? JSON.parse(item.json)
+                : item.json;
+
+            if (jsonVal?.author && jsonVal?.permlink) {
+              mapped.push({
+                id,
+                author: jsonVal.author,
+                permlink: jsonVal.permlink,
+                date: item.timestamp,
+              });
+            }
+          } catch (e) {}
         }
-      }
-      return curations;
+
+        return mapped;
+      });
+
+      const results = await Promise.all(promises);
+      return results.flat();
     } catch (fallbackError) {
-      console.error("Curation fallback (HAFAH) also failed:", fallbackError);
+      console.error(
+        "HAFSQL fallback also failed:",
+        fallbackError,
+      );
       return [];
     }
   }
 };
-
 export const getAccountDetails = async (username: string): Promise<any | null> => {
   try {
     const result = await hiveFetch("condenser_api.get_accounts", [[username]]);

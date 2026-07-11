@@ -38,7 +38,7 @@ import {
   Hash,
   Layers,
   Newspaper,
-  BookOpen, VolumeX, Volume2, MoreVertical
+  BookOpen, VolumeX, Volume2, MoreVertical, RefreshCw
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useCommunity } from "../contexts/CommunityContext";
@@ -235,7 +235,16 @@ const Explorer: React.FC = () => {
       (localStorage.getItem("explorer_layout_mode") as "classic" | "journal") || "journal"
     );
   });
-  const [curatedPosts, setCuratedPosts] = useState<any[]>([]);
+  const [curatedPosts, setCuratedPosts] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem(`journal_cache_${community}`);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        return parsed.curatedPosts || [];
+      }
+    } catch (e) {}
+    return [];
+  });
   const [cacheList, setCacheList] = useState<HivePost[]>([]);
   const [loadingCurations, setLoadingCurations] = useState(false);
   const [curatingPost, setCuratingPost] = useState<HivePost | null>(null);
@@ -259,7 +268,25 @@ const Explorer: React.FC = () => {
   });
   const [trendingTags, setTrendingTags] = useState<string[]>([]);
 
-  const fetchCurations = async () => {
+  const fetchCurations = async (forceRefresh: boolean = false) => {
+    const cacheKey = `journal_cache_${community}`;
+
+    if (!forceRefresh) {
+      try {
+        const cached = localStorage.getItem(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const TWELVE_HOURS = 12 * 60 * 60 * 1000;
+          if (Date.now() - parsed.timestamp < TWELVE_HOURS) {
+            setCuratedPosts(parsed.curatedPosts || []);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Error reading journal cache:", e);
+      }
+    }
+
     setLoadingCurations(true);
     try {
       // 1. Fetch 200 latest discussions from SCOT (Cache)
@@ -270,23 +297,65 @@ const Explorer: React.FC = () => {
       const curations = await getAdminCuratedPosts('faireye');
 
       // 3. Match curation list to cache or fetch individually
-      const withContent = await Promise.all(curations.map(async (c: any) => {
-        let post = cache.find(p => p.author === c.author && p.permlink === c.permlink);
-        if (!post) {
-          const [scot, hive] = await Promise.all([
-             getScotPost(c.author, c.permlink, community),
-             getPostContent(c.author, c.permlink)
-          ]);
-          if (hive) {
-             post = { ...hive, ...scot, json_metadata: hive.json_metadata, body: hive.body, active_votes: scot?.active_votes || hive.active_votes };
-          } else {
-             post = scot;
+      const withContent = [];
+      const chunkSize = 5;
+      for (let i = 0; i < curations.length; i += chunkSize) {
+        const chunk = curations.slice(i, i + chunkSize);
+        const chunkResults = await Promise.all(chunk.map(async (c: any) => {
+          let post = cache.find(p => p.author === c.author && p.permlink === c.permlink);
+          if (!post) {
+            try {
+              const [scot, hive] = await Promise.all([
+                 getScotPost(c.author, c.permlink, community),
+                 getPostContent(c.author, c.permlink)
+              ]);
+              if (hive) {
+                 post = { ...hive, ...scot, json_metadata: hive.json_metadata, body: hive.body, active_votes: scot?.active_votes || hive.active_votes };
+              } else {
+                 post = scot;
+              }
+            } catch (err) {
+              console.error("Error fetching curated post", c.permlink, err);
+            }
           }
+          return { ...c, post };
+        }));
+        withContent.push(...chunkResults);
+        
+        // Small delay between chunks
+        if (i + chunkSize < curations.length) {
+          await new Promise(r => setTimeout(r, 200));
         }
-        return { ...c, post };
-      }));
+      }
 
-      setCuratedPosts(withContent.filter(c => c.post));
+      const finalCurated = withContent.filter(c => c.post);
+      setCuratedPosts(finalCurated);
+
+      try {
+        const compactCurated = finalCurated.map(c => {
+          if (!c.post) return c;
+          const p = c.post;
+          return {
+            ...c,
+            post: {
+              ...p,
+              body: p.body ? p.body.substring(0, 300) : "", // Only need a snippet
+              active_votes: p.active_votes
+                ? p.active_votes
+                    .filter((v: any) => v.percent !== 0)
+                    .map((v: any) => ({ voter: v.voter, percent: v.percent }))
+                : []
+            }
+          };
+        });
+
+        localStorage.setItem(cacheKey, JSON.stringify({
+          curatedPosts: compactCurated,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        console.error("Error writing journal cache:", e);
+      }
     } catch (error) {
       console.error("Error fetching curations:", error);
     } finally {
@@ -341,7 +410,7 @@ const Explorer: React.FC = () => {
       alert(`Successfully curated under news_${flair}!`);
       // Reload curated posts
       if (layoutMode === "journal") {
-        fetchCurations();
+        fetchCurations(true);
       }
     } catch (err: any) {
       alert("Failed to curate: " + (err.message || err));
@@ -664,7 +733,7 @@ const Explorer: React.FC = () => {
               {t("nav.post")}
             </Link>
             
-            <div className="flex bg-slate-900 p-0.5 rounded-lg border border-slate-700 shadow-inner">
+            <div className="flex bg-slate-900 p-0.5 rounded-lg border border-slate-700 shadow-inner gap-0.5">
               <button
                 onClick={() => setLayoutMode("classic")}
                 className={`p-1 px-2.5 flex items-center gap-1.5 text-xs font-bold rounded-md transition-all ${layoutMode === "classic" ? "bg-slate-800 text-cent shadow border border-slate-700/50" : "text-slate-500 hover:text-white"}`}
@@ -681,6 +750,16 @@ const Explorer: React.FC = () => {
                 <Newspaper size={14} />
                 <span className="hidden sm:inline">Journal</span>
               </button>
+              {layoutMode === "journal" && (
+                <button
+                  onClick={() => fetchCurations(true)}
+                  disabled={loadingCurations}
+                  className="p-1 px-2 text-slate-500 hover:text-white hover:bg-slate-800 rounded-md transition-all disabled:opacity-50 flex items-center justify-center"
+                  title="Atualizar Jornal"
+                >
+                  <RefreshCw size={14} className={loadingCurations ? "animate-spin text-hive" : ""} />
+                </button>
+              )}
             </div>
 
             {layoutMode === "classic" && (

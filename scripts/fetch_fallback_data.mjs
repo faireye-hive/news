@@ -43,7 +43,52 @@ async function fetchAndSave() {
 
       firstPage = false;
 
-      allPosts.push(...pagePosts);
+      // Compress items for smaller fallback payload
+      const compactPosts = pagePosts.map(p => {
+        let parsedMeta = {};
+        if (p.json_metadata) {
+          try {
+            parsedMeta = typeof p.json_metadata === 'string' 
+              ? JSON.parse(p.json_metadata) 
+              : p.json_metadata;
+          } catch (e) {}
+        }
+        
+        let firstImage = null;
+        if (parsedMeta.image && Array.isArray(parsedMeta.image) && parsedMeta.image.length > 0) {
+          firstImage = parsedMeta.image[0];
+        } else if (parsedMeta.images && Array.isArray(parsedMeta.images) && parsedMeta.images.length > 0) {
+          firstImage = parsedMeta.images[0];
+        } else if (typeof parsedMeta.image === 'string') {
+          firstImage = parsedMeta.image;
+        }
+
+        let upvotes = 0;
+        let downvotes = 0;
+        if (p.active_votes && Array.isArray(p.active_votes)) {
+          p.active_votes.forEach(v => {
+            if (v.percent > 0) upvotes++;
+            else if (v.percent < 0) downvotes++;
+          });
+        }
+
+        return {
+          author: p.author,
+          permlink: p.permlink,
+          title: p.title,
+          created: p.created,
+          desc: p.desc ? p.desc.substring(0, 180) : "",
+          vote_rshares: p.vote_rshares || "0",
+          pending_token: p.pending_token || 0,
+          net_votes: upvotes - downvotes,
+          json_metadata: JSON.stringify({
+            image: firstImage ? [firstImage] : [],
+            tags: parsedMeta.tags || []
+          })
+        };
+      });
+
+      allPosts.push(...compactPosts);
 
       console.log(`Total: ${allPosts.length}`);
 
@@ -72,7 +117,7 @@ async function fetchAndSave() {
 
     fs.writeFileSync(
       filePath,
-      JSON.stringify(allPosts, null, 2),
+      JSON.stringify(allPosts),
       'utf8'
     );
 
