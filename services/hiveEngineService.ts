@@ -314,13 +314,33 @@ export const getHivePosts = async (
       const cached = await localforage.getItem<HivePost[]>(cacheKey);
       
       if (!cached || !Array.isArray(cached) || cached.length === 0) {
-        if (sort === 'created' && !tag && !start_author) {
+        if (!start_author) {
           try {
-            const fallbackRes = await fetch('./fallback_discussions.json');
+            const fallbackRes = await fetch('/fallback_discussions.json');
             if (fallbackRes.ok) {
-              const fallbackData = await fallbackRes.json();
+              let fallbackData = await fallbackRes.json();
               if (Array.isArray(fallbackData) && fallbackData.length > 0) {
                 console.log("Loaded posts from fallback JSON");
+
+                // Filter by tag if provided
+                if (tag && sort !== 'feed') {
+                  const searchTag = tag.toLowerCase();
+                  fallbackData = fallbackData.filter((p: any) => {
+                    try {
+                      let metadataObj = p.json_metadata;
+                      if (typeof metadataObj === 'string') metadataObj = JSON.parse(metadataObj);
+                      const postTags = (metadataObj?.tags || []).map((t: string) => t.toLowerCase());
+                      return postTags.includes(searchTag);
+                    } catch (e) {
+                      return false;
+                    }
+                  });
+                }
+
+                // Sort fallback data
+                if (sort === 'trending' || sort === 'hot') {
+                  fallbackData.sort((a: any, b: any) => (b.pending_token || 0) - (a.pending_token || 0));
+                }
                 
                 // Dispara a mesma lógica de atualização em background
                 scotFetch(`/get_discussions_by_${sort}?${query.toString()}`).then(async (freshData) => {

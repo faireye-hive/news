@@ -5,7 +5,7 @@ import {
   getTrendingTags, getAdminCuratedPosts, getPostContent, getScotPost,
 } from "../services/hiveEngineService";
 import { HivePost, TribeInfo } from "../types";
-import { communityConfig, bannedUsers } from "../config";
+import { communityConfig, bannedUsers, hiddenTags, userFlairs } from "../config";
 import { sanitizeUrl } from "../utils/security";
 import { extractImage, getProxiedImageUrl } from "../utils/image";
 import {
@@ -289,19 +289,15 @@ const Explorer: React.FC = () => {
 
     setLoadingCurations(true);
     try {
-      // 1. Fetch 200 latest discussions from SCOT (Cache)
-      let cache = await getHivePosts(community, 'created', 200);
+      let cache: any[] = [];
       
       // Load fallback discussions to avoid individual fetches for older curated posts
       try {
-        const fallbackRes = await fetch('./fallback_discussions.json');
+        const fallbackRes = await fetch('/fallback_discussions.json');
         if (fallbackRes.ok) {
           const fallbackData = await fallbackRes.json();
           if (Array.isArray(fallbackData)) {
-            // Append fallback data to cache, avoiding duplicates
-            const cacheKeys = new Set(cache.map(p => `${p.author}/${p.permlink}`));
-            const uniqueFallback = fallbackData.filter(p => !cacheKeys.has(`${p.author}/${p.permlink}`));
-            cache = [...cache, ...uniqueFallback];
+            cache = fallbackData;
           }
         }
       } catch (err) {
@@ -345,7 +341,37 @@ const Explorer: React.FC = () => {
         }
       }
 
-      const finalCurated = withContent.filter(c => c.post);
+      const lowercaseBanned = (bannedUsers || []).map((u) => u.toLowerCase());
+      const lowercaseHiddenTags = (hiddenTags || []).map((t) => t.toLowerCase());
+
+      const finalCurated = withContent.filter(c => {
+        if (!c.post) return false;
+        
+        // Filter by banned users
+        if (lowercaseBanned.includes(c.post.author.toLowerCase())) {
+          return false;
+        }
+
+        // Filter by hidden tags
+        if (lowercaseHiddenTags.length > 0) {
+          try {
+            let metadataObj: any = c.post.json_metadata;
+            if (typeof metadataObj === 'string') {
+              metadataObj = JSON.parse(metadataObj);
+            }
+            const postTags = (metadataObj?.tags || []).map((t: string) => t.toLowerCase());
+            const hasHiddenTag = postTags.some((tag: string) => lowercaseHiddenTags.includes(tag));
+            if (hasHiddenTag) {
+              return false;
+            }
+          } catch (e) {
+            // Ignore parsing errors
+          }
+        }
+        
+        return true;
+      });
+      
       setCuratedPosts(finalCurated);
 
       try {
@@ -498,12 +524,15 @@ const Explorer: React.FC = () => {
 
   useEffect(() => {
     const init = async () => {
-      const [info, tags] = await Promise.all([
+      // Don't wait for these to load before fetching posts
+      Promise.all([
         getTribeInfo(community),
         getTrendingTags(community, 20),
-      ]);
-      setTribeInfo(info);
-      setTrendingTags(tags);
+      ]).then(([info, tags]) => {
+        setTribeInfo(info);
+        setTrendingTags(tags);
+      }).catch(err => console.error(err));
+      
       fetchPosts(true);
     };
     init();
@@ -534,9 +563,33 @@ const Explorer: React.FC = () => {
     );
 
     const lowercaseBanned = (bannedUsers || []).map((u) => u.toLowerCase());
-    const filteredData = data.filter(
-      (p) => !lowercaseBanned.includes(p.author.toLowerCase()),
-    );
+    const lowercaseHiddenTags = (hiddenTags || []).map((t) => t.toLowerCase());
+
+    const filteredData = data.filter((p) => {
+      // Check for banned users
+      if (lowercaseBanned.includes(p.author.toLowerCase())) {
+        return false;
+      }
+
+      // Check for hidden tags
+      if (lowercaseHiddenTags.length > 0) {
+        try {
+          let metadataObj: any = p.json_metadata;
+          if (typeof metadataObj === 'string') {
+            metadataObj = JSON.parse(metadataObj);
+          }
+          const postTags = (metadataObj?.tags || []).map((t: string) => t.toLowerCase());
+          const hasHiddenTag = postTags.some((tag: string) => lowercaseHiddenTags.includes(tag));
+          if (hasHiddenTag) {
+            return false;
+          }
+        } catch (e) {
+          // Ignore parsing errors
+        }
+      }
+
+      return true;
+    });
 
     if (reset) {
       setPosts(filteredData);
@@ -1215,12 +1268,19 @@ const Explorer: React.FC = () => {
                      <div className="flex flex-col justify-between w-full lg:w-2/5 py-2">
                        <div>
                          <div className="flex items-center gap-2 mb-4 text-xs font-bold uppercase tracking-wider text-slate-400">
-                           <Link to={`/profile/${highlightPost.author}`} className="hover:text-white transition-colors flex items-center gap-2">
-                             <img src={`https://images.hive.blog/u/${highlightPost.author}/avatar`} alt={highlightPost.author} className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700" />
-                             <span className="font-extrabold text-slate-300 hover:text-white">@{highlightPost.author}</span>
-                           </Link>
-                           <span>&bull;</span>
-                           <span className="font-mono text-slate-500">{timeAgo(highlightPost.created)}</span>
+                           <div className="flex items-center gap-2 min-w-0">
+                             <Link to={`/profile/${highlightPost.author}`} className="hover:text-white transition-colors flex items-center gap-2 min-w-0 shrink">
+                               <img src={`https://images.hive.blog/u/${highlightPost.author}/avatar`} alt={highlightPost.author} className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 shrink-0" />
+                               <span className="font-extrabold text-slate-300 hover:text-white truncate">@{highlightPost.author}</span>
+                             </Link>
+                             {userFlairs[highlightPost.author] && (
+                               <span className="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase border border-blue-700/50 shrink-0">
+                                 {userFlairs[highlightPost.author]}
+                               </span>
+                             )}
+                           </div>
+                           <span className="shrink-0">&bull;</span>
+                           <span className="font-mono text-slate-500 shrink-0">{timeAgo(highlightPost.created)}</span>
                          </div>
                          
                          <Link to={`/@${highlightPost.author}/${highlightPost.permlink}`} state={{ backgroundLocation: actualLocation }} className="block">
@@ -1636,12 +1696,19 @@ const Explorer: React.FC = () => {
                       
                       <div className={`flex flex-col flex-1 ${isFeatured ? "lg:py-8" : ""}`}>
                         <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                          <Link to={`/profile/${post.author}`} className="hover:text-white transition-colors flex items-center gap-2">
-                            <img src={`https://images.hive.blog/u/${post.author}/avatar`} alt={post.author} className="w-6 h-6 rounded-full bg-slate-800" />
-                            {post.author}
-                          </Link>
-                          <span>&bull;</span>
-                          <span>{timeAgo(post.created)}</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Link to={`/profile/${post.author}`} className="hover:text-white transition-colors flex items-center gap-2 min-w-0 shrink">
+                              <img src={`https://images.hive.blog/u/${post.author}/avatar`} alt={post.author} className="w-6 h-6 rounded-full bg-slate-800 shrink-0" />
+                              <span className="truncate">{post.author}</span>
+                            </Link>
+                            {userFlairs[post.author] && (
+                              <span className="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase border border-blue-700/50 shrink-0">
+                                {userFlairs[post.author]}
+                              </span>
+                            )}
+                          </div>
+                          <span className="shrink-0">&bull;</span>
+                          <span className="shrink-0">{timeAgo(post.created)}</span>
                         </div>
                         
                         <Link to={`/@${post.author}/${post.permlink}`} state={{ backgroundLocation: actualLocation }} className="block group-hover:text-slate-300 transition-colors">
@@ -1726,28 +1793,35 @@ const Explorer: React.FC = () => {
                       className={`p-5 flex flex-col flex-1 ${viewMode === "list" ? "justify-between" : ""}`}
                     >
                       <div className="flex items-center gap-1.5 sm:gap-3 mb-3">
-                        <Link
-                          to={`/profile/${post.author}`}
-                          className="shrink-0"
-                        >
-                          <img
-                            src={`https://images.hive.blog/u/${post.author}/avatar`}
-                            alt={post.author}
-                            className="w-7 h-7 rounded-full border border-slate-600 object-cover hover:border-cent transition-colors"
-                          />
-                        </Link>
-                        <Link
-                          to={`/profile/${post.author}`}
-                          className="text-xs font-bold text-slate-300 hover:text-cent cursor-pointer truncate"
-                        >
-                          @{post.author}
-                        </Link>
-                        {viewMode === "list" && mainTag && (
-                          <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded text-xs font-medium border border-slate-700/50 capitalize truncate max-w-[100px] ml-2">
-                            #{mainTag}
-                          </span>
-                        )}
-                        <span className="text-xs font-medium text-slate-500 flex items-center gap-1 ml-auto shrink-0">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
+                          <Link
+                            to={`/profile/${post.author}`}
+                            className="shrink-0"
+                          >
+                            <img
+                              src={`https://images.hive.blog/u/${post.author}/avatar`}
+                              alt={post.author}
+                              className="w-7 h-7 rounded-full border border-slate-600 object-cover hover:border-cent transition-colors"
+                            />
+                          </Link>
+                          <Link
+                            to={`/profile/${post.author}`}
+                            className="text-xs font-bold text-slate-300 hover:text-cent cursor-pointer truncate min-w-0"
+                          >
+                            @{post.author}
+                          </Link>
+                          {userFlairs[post.author] && (
+                            <span className="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase border border-blue-700/50 shrink-0">
+                              {userFlairs[post.author]}
+                            </span>
+                          )}
+                          {viewMode === "list" && mainTag && (
+                            <span className="bg-slate-800 text-slate-300 px-2 py-0.5 rounded text-xs font-medium border border-slate-700/50 capitalize truncate max-w-[100px] hidden sm:inline-block shrink-0">
+                              #{mainTag}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-xs font-medium text-slate-500 flex items-center gap-1 shrink-0">
                           <Calendar size={12} />
                           {timeAgo(post.created)}
                         </span>

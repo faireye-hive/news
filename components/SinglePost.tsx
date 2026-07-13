@@ -7,7 +7,7 @@ import {
   getPostReplies,
 } from "../services/hiveEngineService";
 import { HivePost, TribeInfo } from "../types";
-import { communityConfig } from "../config";
+import { communityConfig, userFlairs } from "../config";
 import {
   ArrowLeft,
   Calendar,
@@ -239,13 +239,20 @@ const CommentItem: React.FC<{
             }
           />
           <div className="flex items-center gap-2">
-            <Link
-              to={`/profile/${localComment.author}`}
-              className="font-bold text-slate-300 text-sm hover:text-cent transition-colors"
-            >
-              @{localComment.author}
-            </Link>
-            <span className="text-xs text-slate-500">
+            <div className="flex items-center gap-2 min-w-0">
+              <Link
+                to={`/profile/${localComment.author}`}
+                className="font-bold text-slate-300 text-sm hover:text-cent transition-colors truncate"
+              >
+                @{localComment.author}
+              </Link>
+              {userFlairs[localComment.author] && (
+                <span className="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase border border-blue-700/50 shrink-0">
+                  {userFlairs[localComment.author]}
+                </span>
+              )}
+            </div>
+            <span className="text-xs text-slate-500 shrink-0">
               • {timeAgo(localComment.created)}
             </span>
           </div>
@@ -874,14 +881,21 @@ const SinglePost: React.FC = () => {
                   className="w-10 h-10 rounded-full border border-slate-500 hover:border-cent transition-colors"
                 />
               </Link>
-              <div>
-                <Link
-                  to={`/profile/${post.author}`}
-                  className="font-bold text-slate-200 hover:text-cent transition-colors block"
-                >
-                  @{post.author}
-                </Link>
-                <div className="text-xs text-slate-500 flex items-center gap-1">
+              <div className="flex flex-col items-start">
+                <div className="flex items-center gap-2">
+                  <Link
+                    to={`/profile/${post.author}`}
+                    className="font-bold text-slate-200 hover:text-cent transition-colors block"
+                  >
+                    @{post.author}
+                  </Link>
+                  {userFlairs[post.author] && (
+                    <span className="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase border border-blue-700/50">
+                      {userFlairs[post.author]}
+                    </span>
+                  )}
+                </div>
+                <div className="text-xs text-slate-500 flex items-center gap-1 mt-1">
                   <Calendar size={12} /> {timeAgo(post.created)}
                 </div>
               </div>

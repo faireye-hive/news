@@ -14,3 +14,13 @@ export const communityConfig: CommunityConfig = {
 // Lista de usuários que você não quer que apareçam no explorer (feed)
 // Adicione os nomes dos usuários que deseja ocultar aqui. Ex: ['user1', 'user2']
 export const bannedUsers: string[] = ['web2.support', 'kgakakillerg', 'bpcvoter1', 'bpcvoter2', 'bpcvoter3'];
+
+// Lista de tags que você não quer que apareçam no explorer (feed)
+// Adicione as tags que deseja ocultar aqui. Ex: ['nsfw', 'test']
+export const hiddenTags: string[] = ['actifit'];
+
+// Flairs (títulos/rótulos) personalizados para usuários específicos
+// Ex: { 'username': 'Moderador' }
+export const userFlairs: Record<string, string> = {
+  'centtoken': 'burn',
+};

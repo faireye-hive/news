@@ -13,7 +13,7 @@ import {
   getFollowCount
 } from '../services/hiveEngineService';
 import { Balance, HivePost, TribeInfo } from '../types';
-import { communityConfig } from '../config';
+import { communityConfig, userFlairs } from '../config';
 import { 
   User, 
   Coins, 
@@ -146,7 +146,7 @@ const Profile: React.FC = () => {
     if (user && currentProfile && user !== currentProfile) {
        const checkFollow = async () => {
          try {
-           const followingRes = await fetch(`https://hafsql-api.mahdiyari.info/accounts/${user}/following?limit=100`);
+           const followingRes = await fetch(`https://rpc.mahdiyari.info/hafsql/accounts/${user}/following?limit=100`);
            const followingData = await followingRes.json();
            if (followingData && Array.isArray(followingData)) {
               if (followingData.some((f: any) => f.following === currentProfile)) {
@@ -156,7 +156,7 @@ const Profile: React.FC = () => {
               }
            }
            
-           const mutedRes = await fetch(`https://hafsql-api.mahdiyari.info/accounts/${user}/muted?limit=100`);
+           const mutedRes = await fetch(`https://rpc.mahdiyari.info/hafsql/accounts/${user}/muted?limit=100`);
            const mutedData = await mutedRes.json();
            if (mutedData && Array.isArray(mutedData)) {
               if (mutedData.some((m: any) => m.following === currentProfile)) {
@@ -533,6 +533,11 @@ const Profile: React.FC = () => {
                   {reputation && (
                     <span className="bg-slate-800 text-slate-400 border border-slate-700/60 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold uppercase tracking-wider">
                       REP {reputation}
+                    </span>
+                  )}
+                  {userFlairs[currentProfile] && (
+                    <span className="bg-blue-900/40 text-blue-300 border border-blue-700/50 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                      {userFlairs[currentProfile]}
                     </span>
                   )}
                 </div>
