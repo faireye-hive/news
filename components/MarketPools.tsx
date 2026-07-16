@@ -160,6 +160,37 @@ const MarketPools: React.FC = () => {
     }
   }, [activeTab]);
 
+  const getTokenPriceInHive = (token: string) => {
+    if (token === 'SWAP.HIVE') return 1;
+
+    const directPool = pools.find(p => p.tokenPair === `${token}:SWAP.HIVE` || p.tokenPair === `SWAP.HIVE:${token}`);
+    if (directPool) {
+      const [tokenA] = directPool.tokenPair.split(':');
+      if (tokenA === token) {
+        return parseFloat(directPool.basePrice);
+      } else {
+        return parseFloat(directPool.quotePrice);
+      }
+    }
+
+    if (token !== community) {
+      const commPool = pools.find(p => p.tokenPair === `${token}:${community}` || p.tokenPair === `${community}:${token}`);
+      const hivePool = pools.find(p => p.tokenPair === `${community}:SWAP.HIVE` || p.tokenPair === `SWAP.HIVE:${community}`);
+
+      if (commPool && hivePool) {
+        const [commTokenA] = commPool.tokenPair.split(':');
+        const tokenInComm = commTokenA === token ? parseFloat(commPool.basePrice) : parseFloat(commPool.quotePrice);
+
+        const [hiveTokenA] = hivePool.tokenPair.split(':');
+        const commInHive = hiveTokenA === community ? parseFloat(hivePool.basePrice) : parseFloat(hivePool.quotePrice);
+
+        return tokenInComm * commInHive;
+      }
+    }
+
+    return null;
+  };
+
   const fetchHolders = async (pair: string) => {
     setLoadingHolders(true);
     try {
@@ -502,9 +533,24 @@ const MarketPools: React.FC = () => {
                          >
                             <div className="flex items-center justify-between w-full">
                                <span className="font-bold text-sm">{tokenA} / {tokenB}</span>
-                               <span className="text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded font-mono border border-slate-700/50">
-                                 1 {tokenA} = {parseFloat(pool.basePrice).toFixed(6)} {tokenB}
-                               </span>
+                               <div className="flex flex-col items-end gap-1">
+                                 <span className="text-xs text-slate-500 bg-slate-800 px-1.5 py-0.5 rounded font-mono border border-slate-700/50">
+                                   1 {tokenA} = {parseFloat(pool.basePrice).toFixed(6)} {tokenB}
+                                 </span>
+                                 {(() => {
+                                   if (pool.tokenPair.includes('SWAP.HIVE')) return null;
+                                   const hivePriceA = getTokenPriceInHive(tokenA);
+                                   const hivePriceB = getTokenPriceInHive(tokenB);
+                                   if (!hivePriceB || !hivePriceA) return null;
+                                   const otherToken = tokenA === community ? tokenB : tokenA;
+                                   const otherPrice = tokenA === community ? hivePriceB : hivePriceA;
+                                   return (
+                                     <span className="text-[9px] text-slate-400 font-mono">
+                                       1 {otherToken} ≈ {otherPrice.toFixed(6)} SWAP.HIVE
+                                     </span>
+                                   );
+                                 })()}
+                               </div>
                             </div>
                             
                             <div className="flex justify-between items-center text-[11px] text-slate-500 font-mono">
@@ -659,8 +705,15 @@ const MarketPools: React.FC = () => {
                                   )}
                                </div>
                                <div className="flex items-center justify-between gap-3">
-                                  <div className="text-2xl font-bold text-slate-300 font-mono py-0.5 select-all">
-                                     {estimatedOut}
+                                  <div className="text-2xl font-bold text-slate-300 font-mono py-0.5 select-all flex flex-col">
+                                     <span>{estimatedOut}</span>
+                                     {(() => {
+                                        if (swapTo === 'SWAP.HIVE' || estimatedOut === '0.00' || isNaN(parseFloat(estimatedOut))) return null;
+                                        const hivePrice = getTokenPriceInHive(swapTo);
+                                        if (!hivePrice) return null;
+                                        const totalHive = parseFloat(estimatedOut) * hivePrice;
+                                        return <span className="text-[10px] text-slate-500 font-mono mt-0.5 font-bold">≈ {totalHive.toFixed(4)} SWAP.HIVE</span>;
+                                     })()}
                                   </div>
                                   <div className="bg-slate-800 border border-slate-700 text-slate-300 font-bold rounded-lg px-4 py-1.5 text-sm">
                                      {swapTo}
@@ -944,14 +997,30 @@ const MarketPools: React.FC = () => {
                                <div className="grid grid-cols-2 gap-4 font-mono text-xs">
                                   <div className="space-y-1.5">
                                      <div className="text-slate-500">1 {selectedPool.tokenPair.split(':')[0]} vale:</div>
-                                     <div className="text-white font-bold bg-slate-950 p-2 rounded text-center">
-                                        {parseFloat(selectedPool.basePrice).toFixed(6)} {selectedPool.tokenPair.split(':')[1]}
+                                     <div className="text-white font-bold bg-slate-950 p-2 rounded text-center flex flex-col">
+                                        <span>{parseFloat(selectedPool.basePrice).toFixed(6)} {selectedPool.tokenPair.split(':')[1]}</span>
+                                        {(() => {
+                                           if (selectedPool.tokenPair.includes('SWAP.HIVE')) return null;
+                                           const tokenA = selectedPool.tokenPair.split(':')[0];
+                                           const tokenB = selectedPool.tokenPair.split(':')[1];
+                                           const hivePrice = getTokenPriceInHive(tokenA);
+                                           if (!hivePrice) return null;
+                                           return <span className="text-[10px] text-slate-500 font-normal mt-0.5">1 {tokenA} ≈ {hivePrice.toFixed(6)} SWAP.HIVE</span>;
+                                        })()}
                                      </div>
                                   </div>
                                   <div className="space-y-1.5">
                                      <div className="text-slate-500">1 {selectedPool.tokenPair.split(':')[1]} vale:</div>
-                                     <div className="text-white font-bold bg-slate-950 p-2 rounded text-center">
-                                        {parseFloat(selectedPool.quotePrice).toFixed(6)} {selectedPool.tokenPair.split(':')[0]}
+                                     <div className="text-white font-bold bg-slate-950 p-2 rounded text-center flex flex-col">
+                                        <span>{parseFloat(selectedPool.quotePrice).toFixed(6)} {selectedPool.tokenPair.split(':')[0]}</span>
+                                        {(() => {
+                                           if (selectedPool.tokenPair.includes('SWAP.HIVE')) return null;
+                                           const tokenA = selectedPool.tokenPair.split(':')[0];
+                                           const tokenB = selectedPool.tokenPair.split(':')[1];
+                                           const hivePrice = getTokenPriceInHive(tokenB);
+                                           if (!hivePrice) return null;
+                                           return <span className="text-[10px] text-slate-500 font-normal mt-0.5">1 {tokenB} ≈ {hivePrice.toFixed(6)} SWAP.HIVE</span>;
+                                        })()}
                                      </div>
                                   </div>
                                </div>
