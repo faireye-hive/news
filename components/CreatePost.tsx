@@ -650,6 +650,7 @@ const CreatePost: React.FC = () => {
                               <option value={20}>20%</option>
                               <option value={25}>25%</option>
                               <option value={50}>50%</option>
+                              <option value={100}>100%</option>
                             </select>
                             <button 
                               type="button"
