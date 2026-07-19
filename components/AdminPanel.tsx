@@ -8,6 +8,7 @@ const AdminPanel: React.FC = () => {
   const [targetUser, setTargetUser] = useState('');
   const [isMuting, setIsMuting] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
   const [userStatus, setUserStatus] = useState<any>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
@@ -38,6 +39,55 @@ const AdminPanel: React.FC = () => {
       setUserStatus(null);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handleResetPool = async () => {
+    if (!user) {
+      setMessage({ type: 'error', text: 'You must be logged in to perform this action.' });
+      return;
+    }
+    
+    if (user !== ADMIN_ACCOUNT) {
+      setMessage({ type: 'error', text: `Only the admin (${ADMIN_ACCOUNT}) can perform this action.` });
+      return;
+    }
+
+    setIsResetting(true);
+    setMessage(null);
+
+    try {
+      const payload = {
+        contractName: 'comments',
+        contractAction: 'resetPool',
+        contractPayload: {
+          rewardPoolId: REWARD_POOL_ID
+        }
+      };
+
+      const response = await customJson(
+        'ssc-mainnet-hive',
+        payload,
+        'Reset Pool',
+        'Active'
+      );
+
+      if (response.success) {
+        setMessage({ 
+          type: 'success', 
+          text: `Successfully reset the reward pool (ID: ${REWARD_POOL_ID}). The transaction has been broadcast.` 
+        });
+      } else {
+        setMessage({ 
+          type: 'error', 
+          text: response.message || 'Failed to broadcast transaction. Make sure you used the Active key.' 
+        });
+      }
+    } catch (err: any) {
+      console.error("Reset pool error:", err);
+      setMessage({ type: 'error', text: err.message || 'An unexpected error occurred.' });
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -200,6 +250,27 @@ const AdminPanel: React.FC = () => {
                   <span>Unmute User</span>
                 </button>
               </div>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-100 dark:border-gray-700 pt-6 mt-6">
+            <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Reset Reward Pool</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              Reset the reward pool for the community. This action requires your <strong>Active Key</strong> to authorize the smart contract transaction.
+            </p>
+            <div className="flex">
+              <button
+                onClick={handleResetPool}
+                disabled={isResetting}
+                className="flex items-center justify-center space-x-2 px-6 py-2.5 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
+              >
+                {isResetting ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <RefreshCw className="w-5 h-5" />
+                )}
+                <span>Reset Pool (ID: {REWARD_POOL_ID})</span>
+              </button>
             </div>
           </div>
         </div>
