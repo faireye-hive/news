@@ -80,7 +80,7 @@ const AdminPanel: React.FC = () => {
       } else {
         setMessage({ 
           type: 'error', 
-          text: response.message || 'Failed to broadcast transaction. Make sure you used the Active key.' 
+          text: (response as any).message || 'Failed to broadcast transaction. Make sure you used the Active key.' 
         });
       }
     } catch (err: any) {
@@ -140,7 +140,7 @@ const AdminPanel: React.FC = () => {
       } else {
         setMessage({ 
           type: 'error', 
-          text: response.message || 'Failed to broadcast transaction. Make sure you used the Active key.' 
+          text: (response as any).message || 'Failed to broadcast transaction. Make sure you used the Active key.' 
         });
       }
     } catch (err: any) {

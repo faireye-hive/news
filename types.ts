@@ -81,6 +81,8 @@ export interface HivePost {
   created: string;
   net_votes: number;
   children: number;
+  parent_permlink?: string;
+  parent_author?: string;
   // Standard Hive Fields (might be present)
   active_votes?: ActiveVote[];
   pending_payout_value?: string;
@@ -108,6 +110,15 @@ export interface HiveKeychain {
     username: string,
     message: string,
     keyType: 'Posting' | 'Active' | 'Memo',
+    callback: (response: KeychainResponse) => void
+  ): void;
+
+  requestCustomJson(
+    username: string,
+    id: string,
+    keyType: "Posting" | "Active",
+    json: string,
+    displayName: string,
     callback: (response: KeychainResponse) => void
   ): void;
   requestVote(

@@ -24,6 +24,8 @@ import {
   Check,
   Settings,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Home,
 } from "lucide-react";
 import { marked } from "marked";
@@ -40,7 +42,8 @@ const CommentItem: React.FC<{
   comment: HivePost;
   tribeInfo: TribeInfo | null;
   readerSettings: any;
-}> = ({ comment, tribeInfo, readerSettings }) => {
+  postAuthor: string;
+}> = ({ comment, tribeInfo, readerSettings, postAuthor }) => {
   const [html, setHtml] = useState("");
   const { user, vote, comment: postComment } = useAuth();
   const { community } = useCommunity();
@@ -51,8 +54,51 @@ const CommentItem: React.FC<{
   const [showReplyBox, setShowReplyBox] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [declinePayout, setDeclinePayout] = useState(false);
+  
+  // Nested replies state
+  const [replies, setReplies] = useState<HivePost[]>([]);
+  const [loadingReplies, setLoadingReplies] = useState(false);
+  const [showReplies, setShowReplies] = useState(false);
+
   // Local state for optimistic updates
   const [localComment, setLocalComment] = useState(comment);
+
+  const fetchReplies = async () => {
+    if (showReplies) {
+      setShowReplies(false);
+      return;
+    }
+    setShowReplies(true);
+    if (replies.length > 0) return;
+
+    setLoadingReplies(true);
+    try {
+      const rawReplies = await getPostReplies(localComment.author, localComment.permlink);
+      
+      const enrichPromises = rawReplies.map(async (reply) => {
+        try {
+          const scotInfo = await getScotPost(reply.author, reply.permlink, community);
+          if (scotInfo) {
+            return {
+              ...reply,
+              active_votes: scotInfo.active_votes || reply.active_votes,
+              vote_rshares: scotInfo.vote_rshares,
+              pending_token: scotInfo.pending_token,
+              precision: scotInfo.precision,
+              net_votes: scotInfo.net_votes || reply.net_votes,
+            };
+          }
+        } catch (e) {}
+        return reply;
+      });
+      const enrichedReplies = await Promise.all(enrichPromises);
+      setReplies(enrichedReplies);
+    } catch (e) {
+      console.error("Error loading nested replies:", e);
+    } finally {
+      setLoadingReplies(false);
+    }
+  };
 
   useEffect(() => {
     const parseBody = async () => {
@@ -239,13 +285,18 @@ const CommentItem: React.FC<{
             }
           />
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
               <Link
                 to={`/profile/${localComment.author}`}
                 className="font-bold text-slate-300 text-sm hover:text-cent transition-colors truncate"
               >
                 @{localComment.author}
               </Link>
+              {localComment.author === postAuthor && (
+                <span className="bg-cent/10 text-cent px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border border-cent/20 shrink-0">
+                  Autor
+                </span>
+              )}
               {userFlairs[localComment.author] && (
                 <span className="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase border border-blue-700/50 shrink-0">
                   {userFlairs[localComment.author]}
@@ -340,6 +391,39 @@ const CommentItem: React.FC<{
           </div>
         </div>
       )}
+
+      {localComment.children > 0 && (
+        <div className="mt-2 md:pl-11 border-l-2 border-slate-800/50 pl-4">
+          <button
+            onClick={fetchReplies}
+            className="text-xs font-bold text-slate-400 hover:text-cent transition-colors flex items-center gap-1.5 mt-2 mb-2 bg-slate-900/50 hover:bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-800/50"
+          >
+            {showReplies ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            {showReplies ? "Ocultar Respostas" : `Ver ${localComment.children} Resposta${localComment.children > 1 ? 's' : ''}`}
+          </button>
+          
+          {showReplies && (
+            <div className="mt-2 space-y-4">
+              {loadingReplies ? (
+                <div className="flex justify-start py-2">
+                  <Loader2 size={16} className="animate-spin text-cent" />
+                </div>
+              ) : (
+                replies.map((reply) => (
+                  <CommentItem
+                    key={`${reply.author}-${reply.permlink}`}
+                    comment={reply}
+                    tribeInfo={tribeInfo}
+                    readerSettings={readerSettings}
+                    postAuthor={postAuthor}
+                  />
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {voteModalPost && (
         <VoteModal
           isOpen={true}
@@ -931,7 +1015,7 @@ const SinglePost: React.FC = () => {
               {(() => {
                 let tags: string[] = [];
                 try {
-                  const meta = JSON.parse(post.json_metadata || "{}");
+                  const meta = typeof post.json_metadata === "string" ? JSON.parse(post.json_metadata || "{}") : (post.json_metadata || {});
                   tags = meta.tags || [];
                 } catch (e) {}
                 const uniqueTags = Array.from(
@@ -1271,6 +1355,7 @@ const SinglePost: React.FC = () => {
                   comment={comment}
                   tribeInfo={tribeInfo}
                   readerSettings={readerSettings}
+                  postAuthor={post?.author || ''}
                 />
               ))}
             </div>

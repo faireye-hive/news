@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useCommunity } from '../contexts/CommunityContext';
 import { 
   Edit3, Loader2, ImagePlus, Hash, Settings, DollarSign, 
   BookOpen, Info, ChevronDown, ChevronUp, Bold, Italic, 
@@ -100,7 +101,8 @@ const CreatePost: React.FC = () => {
   // Core post fields
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
-  const [tagsList, setTagsList] = useState<string[]>(['news']);
+  const { community } = useCommunity();
+  const [tagsList, setTagsList] = useState<string[]>([community.toLowerCase()]);
   const [tagInput, setTagInput] = useState('');
   const [coverImage, setCoverImage] = useState('');
   
@@ -221,7 +223,7 @@ const CreatePost: React.FC = () => {
 
     const tagsArray = [...tagsList];
     if (tagsArray.length === 0) {
-       tagsArray.push('news');
+       tagsArray.push(community.toLowerCase());
     }
 
     setIsPublishing(true);
@@ -804,7 +806,7 @@ const CreatePost: React.FC = () => {
                    </div>
                  )}
                  <span className="absolute top-2 right-2 bg-black/70 text-[9px] text-hive font-bold px-2 py-0.5 rounded uppercase tracking-wider">
-                   {tagsList[0] || 'news'}
+                   {tagsList[0] || community.toLowerCase()}
                  </span>
                </div>
 
@@ -812,10 +814,10 @@ const CreatePost: React.FC = () => {
                <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                  <div className="flex items-center gap-2">
                    <div className="w-6 h-6 rounded-full border border-hive/40 bg-slate-900 flex items-center justify-center text-hive text-xs font-bold shrink-0">
-                     {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                     {user ? user.charAt(0).toUpperCase() : 'U'}
                    </div>
                    <div className="flex-1 min-w-0">
-                     <div className="text-[11px] font-bold text-white truncate">@{user?.name || 'anonymous'}</div>
+                     <div className="text-[11px] font-bold text-white truncate">@{user || 'anonymous'}</div>
                      <div className="text-[9px] text-slate-500 flex items-center gap-1">
                        <span>Just now</span> &middot; <span>{readingTimeEstimate} {dict.readingTime}</span>
                      </div>

@@ -299,11 +299,7 @@ export const getHivePosts = async (
   if (start_author) query.append('start_author', start_author);
   if (start_permlink) query.append('start_permlink', start_permlink);
   if (tag) {
-    if (sort === 'feed' && !tag.startsWith('@')) {
-      query.append('tag', '@' + tag);
-    } else {
-      query.append('tag', tag);
-    }
+    query.append('tag', tag);
   }
 
   const isInitialLoad = !start_author;
@@ -323,7 +319,7 @@ export const getHivePosts = async (
                 console.log("Loaded posts from fallback JSON");
 
                 // Filter by tag if provided
-                if (tag && sort !== 'feed') {
+                if (tag) {
                   const searchTag = tag.toLowerCase();
                   fallbackData = fallbackData.filter((p: any) => {
                     try {
@@ -365,8 +361,8 @@ export const getHivePosts = async (
         scotFetch(`/get_discussions_by_${sort}?${query.toString()}`).then(async (freshData) => {
           if (Array.isArray(freshData)) {
             // Verifica se houve mudança analisando a quantidade de votos/tempo (simplificado pelo objeto JSON modificado)
-            const isDifferent = JSON.stringify(cached.map(p => ({ votes: p.active_votes?.length, comments: p.children, id: p.id }))) !== 
-                                JSON.stringify(freshData.map(p => ({ votes: p.active_votes?.length, comments: p.children, id: p.id })));
+            const isDifferent = JSON.stringify(cached.map(p => ({ votes: p.active_votes?.length, comments: p.children, id: p.post_id }))) !== 
+                                JSON.stringify(freshData.map(p => ({ votes: p.active_votes?.length, comments: p.children, id: p.post_id })));
             
             if (isDifferent) {
               await localforage.setItem(cacheKey, freshData);

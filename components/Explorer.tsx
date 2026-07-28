@@ -432,7 +432,7 @@ const Explorer: React.FC = () => {
       if (response.success) {
         alert(`Successfully ${mute ? 'muted' : 'unmuted'} post.`);
       } else {
-        alert(response.message || 'Failed to broadcast transaction.');
+        alert((response as any).message || 'Failed to broadcast transaction.');
       }
     } catch (err: any) {
       alert(err.message || 'An unexpected error occurred.');
@@ -1080,7 +1080,7 @@ const Explorer: React.FC = () => {
                                     onClick={() =>
                                       setSearchParams({ tag: sub })
                                     }
-                                    className={`w-full text-left px-3 py-1.5 pr-8 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${tag === sub ? (layoutMode === "journal" ? "text-white bg-slate-800" : "text-cent bg-cent/10") + " font-bold" : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"}`}
+                                    className={`w-full text-left px-3 py-1.5 pr-8 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${tag === sub ? "text-cent bg-cent/10 font-bold" : "text-slate-500 hover:text-slate-300 hover:bg-slate-800/50"}`}
                                   >
                                     <Hash size={12} className="opacity-50" />
                                     <span className="truncate block">
@@ -1643,7 +1643,7 @@ const Explorer: React.FC = () => {
 
                 let postTags: string[] = [];
                 try {
-                  const meta = JSON.parse(post.json_metadata || "{}");
+                  const meta = typeof post.json_metadata === "string" ? JSON.parse(post.json_metadata || "{}") : (post.json_metadata || {});
                   postTags = Array.isArray(meta.tags)
                     ? meta.tags.filter((t: any) => typeof t === "string")
                     : [];
@@ -1672,7 +1672,7 @@ const Explorer: React.FC = () => {
                             alt={post.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                             onError={(e) => {
-                              (e.target).src = "https://placehold.co/600x400/0f172a/334155?text=News";
+                              (e.target as HTMLImageElement).src = "https://placehold.co/600x400/0f172a/334155?text=News";
                             }}
                             fetchPriority={index === 0 ? "high" : "auto"}
                             loading={index === 0 ? "eager" : "lazy"}
@@ -2006,7 +2006,7 @@ const Explorer: React.FC = () => {
 
                           {viewMode === "list" && (
                             <div
-                              className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 font-mono text-xs ${isPaid ? "text-slate-400 bg-slate-800" : (layoutMode === "journal" ? "text-white bg-slate-800" : "text-cent bg-cent/10")}`}
+                              className={`px-2.5 py-1 rounded font-bold flex items-center gap-1 font-mono text-xs ${isPaid ? "text-slate-400 bg-slate-800" : "text-cent bg-cent/10"}`}
                             >
                               {reward} {community}
                             </div>

@@ -14,6 +14,7 @@ import Feed from "./components/Feed";
 import Profile from "./components/Profile";
 import HiddenUsers from "./components/HiddenUsers";
 import CreatePost from "./components/CreatePost";
+import Settings from "./components/Settings";
 import Discovery from "./components/Discovery";
 import {
   LayoutDashboard,
@@ -33,6 +34,7 @@ import {
   MessageSquare,
   Globe2,
   Shield,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import AdminPanel from "./components/AdminPanel";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -69,6 +71,8 @@ const ThemeToggle: React.FC = () => {
     </button>
   );
 };
+
+
 
 const LanguageToggle: React.FC = () => {
   const { language, setLanguage } = useLanguage();
@@ -115,7 +119,7 @@ const MobileNavLink: React.FC<{
       to={to}
       className={`flex flex-col items-center justify-center gap-1 w-full py-2 transition-all ${active ? "text-cent" : "text-slate-500 hover:text-slate-300"}`}
     >
-      {React.cloneElement(icon as React.ReactElement, {
+      {React.cloneElement(icon as React.ReactElement<any>, {
         className: active ? "drop-shadow-md" : "",
       })}
       <span className="text-[10px] font-medium tracking-wide">{label}</span>
@@ -188,6 +192,13 @@ const LoginButton: React.FC = () => {
                 className="flex items-center gap-2 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors"
               >
                 <User size={16} /> {t("nav.hiddenUsers")}
+              </Link>
+                            <Link
+                to="/settings"
+                onClick={() => setMenuOpen(false)}
+                className="flex items-center gap-2 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors border-t border-slate-700/50"
+              >
+                <SettingsIcon size={16} /> Configurações
               </Link>
               {user === 'faireye' && (
                 <Link
@@ -411,6 +422,7 @@ const AppContent: React.FC = () => {
           <Route path="/profile/:username?" element={<Profile />} />
           <Route path="/hidden-users" element={<HiddenUsers />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/settings" element={<Settings />} />
           <Route path="/create-post" element={<CreatePost />} />
           <Route path="/post/:author/:permlink" element={<SinglePost />} />
           <Route path="/:author/:permlink" element={<SinglePost />} />
