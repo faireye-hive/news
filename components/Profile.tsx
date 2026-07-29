@@ -1,3 +1,14 @@
+const getAuthorName = (post: any) => {
+  if (!post) return "";
+  try {
+    const meta = typeof post.json_metadata === "string" ? JSON.parse(post.json_metadata) : post.json_metadata;
+    if (meta && meta.author_nickname) {
+       return `${meta.author_nickname}`;
+    }
+  } catch (e) {}
+  return post.author;
+};
+
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCommunity } from '../contexts/CommunityContext';
@@ -65,13 +76,18 @@ const getReputation = (rep?: string | number) => {
 };
 
 const Profile: React.FC = () => {
-  const { user, customJson, vote } = useAuth();
+  const { user, lightAccount, customJson, vote } = useAuth();
   const { community } = useCommunity();
   const location = useLocation();
   const { username } = useParams<{ username: string }>();
   const { t } = useLanguage();
   
+  const searchParams = new URLSearchParams(location.search);
+  const targetNickname = searchParams.get('nickname');
+
   const currentProfile = username?.toLowerCase() || user;
+  const isViewingOwnLightAccount = currentProfile === user && !!lightAccount && (!targetNickname || targetNickname === lightAccount.nickname);
+  const displayNickname = isViewingOwnLightAccount ? lightAccount.nickname : targetNickname;
   
   const [balance, setBalance] = useState<Balance | null>(null);
   const [scotData, setScotData] = useState<any>(null);
@@ -178,8 +194,16 @@ const Profile: React.FC = () => {
     if (activeTab === 'wallet') return;
     const fetchDiscussions = async () => {
        setLoadingDiscussions(true);
-       const data = await getUserDiscussions(currentProfile, activeTab, community, 20);
-       setDiscussions(data);
+       let data = await getUserDiscussions(currentProfile, activeTab, community, displayNickname ? 50 : 20);
+       if (displayNickname) {
+         data = data.filter((post: any) => {
+           try {
+             const meta = typeof post.json_metadata === 'string' ? JSON.parse(post.json_metadata) : post.json_metadata;
+             return meta?.author_nickname === displayNickname;
+           } catch(e) { return false; }
+         });
+       }
+       setDiscussions(data.slice(0, 20));
        setLoadingDiscussions(false);
     };
     fetchDiscussions();
@@ -450,7 +474,7 @@ const Profile: React.FC = () => {
     }
   }
 
-  const displayName = profileMetadata.name || currentProfile;
+  const displayName = displayNickname || profileMetadata.name || currentProfile;
   const bio = profileMetadata.about || `Fazendo curadoria e publicando as melhores notícias e artigos na comunidade ${community.toUpperCase()}.`;
   const locationText = profileMetadata.location || `NEWS Holder`;
   const website = profileMetadata.website || '';
@@ -543,7 +567,7 @@ const Profile: React.FC = () => {
                 </div>
 
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-3 gap-y-1 text-xs text-slate-400 font-medium">
-                  <span className="font-mono text-slate-300">@{currentProfile}</span>
+                  <span className="font-mono text-slate-300">@{displayNickname || currentProfile}</span>
                   <span className="text-slate-600">&bull;</span>
                   <span className="bg-hive/10 text-hive border border-hive/20 px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider">
                     {balance ? parseFloat(balance.stake).toLocaleString(undefined, { maximumFractionDigits: 0 }) : '0'} {community.toUpperCase()} POWER
@@ -917,7 +941,7 @@ const Profile: React.FC = () => {
                                     (e.target as HTMLImageElement).src = `https://images.hive.blog/u/${post.author}/avatar`;
                                   }}
                                 />
-                                <Link to={`/profile/${post.author}`} className="hover:text-hive transition-colors text-slate-400">
+                                <Link to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`} className="hover:text-hive transition-colors text-slate-400">
                                   em {community.toUpperCase()}
                                 </Link>
                                 <span>&bull;</span>
@@ -939,8 +963,8 @@ const Profile: React.FC = () => {
                               {/* Card Footer Actions */}
                               <div className="flex items-center justify-between pt-3 border-t border-slate-800/40 mt-3">
                                 <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
-                                  <Link to={`/profile/${post.author}`} className="font-mono text-slate-300 hover:text-hive transition-colors">
-                                    @{post.author}
+                                  <Link to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`} className="font-mono text-slate-300 hover:text-hive transition-colors">
+                                    @{getAuthorName(post)}
                                   </Link>
                                   
                                   {/* Upvote Button with list click */}
@@ -1005,8 +1029,8 @@ const Profile: React.FC = () => {
                                 alt={post.author}
                                 className="w-4 h-4 rounded-full border border-slate-800"
                               />
-                              <Link to={`/profile/${post.author}`} className="hover:text-hive text-slate-400">
-                                @{post.author}
+                              <Link to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`} className="hover:text-hive text-slate-400">
+                                @{getAuthorName(post)}
                               </Link>
                               <span>&bull;</span>
                               <span>{new Date(post.created + 'Z').toLocaleDateString()}</span>
@@ -1099,7 +1123,7 @@ const Profile: React.FC = () => {
            <div className="bg-slate-900/40 border border-slate-800/40 rounded-3xl p-6 space-y-4 shadow-xl backdrop-blur-sm">
              <div className="flex flex-col items-center justify-center text-center pb-2 border-b border-slate-800/40">
                 <span className="text-white font-black text-lg tracking-tight">{displayName}</span>
-                <span className="text-slate-500 font-mono text-xs">@{currentProfile}</span>
+                <span className="text-slate-500 font-mono text-xs">@{displayNickname || currentProfile}</span>
              </div>
 
              {/* Stats Grid 2x2 */}

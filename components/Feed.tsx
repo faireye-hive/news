@@ -12,6 +12,16 @@ import { extractImage } from '../utils/image';
 import VoteModal from './VoteModal';
 import { VotersModal } from './VotersModal';
 
+const getAuthorName = (post: HivePost) => {
+  try {
+    const meta = typeof post.json_metadata === 'string' ? JSON.parse(post.json_metadata) : post.json_metadata;
+    if (meta && meta.author_nickname) {
+       return `${meta.author_nickname}`;
+    }
+  } catch (e) {}
+  return post.author;
+};
+
 const Feed: React.FC = () => {
   const { user, vote } = useAuth();
   const { t } = useLanguage();
@@ -145,13 +155,13 @@ const Feed: React.FC = () => {
                 </Link>
                 <div className="flex-1 flex flex-col min-w-0">
                   <div className="flex items-center gap-2 mb-3 h-8">
-                     <Link to={`/profile/${post.author}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0">
+                     <Link to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0">
                         <img 
                            src={`https://images.hive.blog/u/${post.author}/avatar`} 
                            alt={post.author}
                            className="w-6 h-6 rounded-full bg-slate-800 shrink-0"
                         />
-                        <span className="font-bold text-slate-200 truncate">{post.author}</span>
+                        <span className="font-bold text-slate-200 truncate">{getAuthorName(post)}</span>
                      </Link>
                      <span className="text-slate-500 text-xs shrink-0">&bull;</span>
                      <span className="text-slate-500 text-xs shrink-0">{new Date(post.created + 'Z').toLocaleDateString()}</span>

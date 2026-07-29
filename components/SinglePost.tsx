@@ -1,3 +1,14 @@
+const getAuthorName = (post: any) => {
+  if (!post) return "";
+  try {
+    const meta = typeof post.json_metadata === "string" ? JSON.parse(post.json_metadata) : post.json_metadata;
+    if (meta && meta.author_nickname) {
+       return `${meta.author_nickname}`;
+    }
+  } catch (e) {}
+  return post.author;
+};
+
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import {
@@ -958,7 +969,7 @@ const SinglePost: React.FC = () => {
 
           <div className="flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-3">
-              <Link to={`/profile/${post.author}`}>
+              <Link to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`}>
                 <img
                   src={`https://images.hive.blog/u/${post.author}/avatar`}
                   alt={post.author}
@@ -968,10 +979,10 @@ const SinglePost: React.FC = () => {
               <div className="flex flex-col items-start">
                 <div className="flex items-center gap-2">
                   <Link
-                    to={`/profile/${post.author}`}
+                    to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`}
                     className="font-bold text-slate-200 hover:text-cent transition-colors block"
                   >
-                    @{post.author}
+                    @{getAuthorName(post)}
                   </Link>
                   {userFlairs[post.author] && (
                     <span className="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase border border-blue-700/50">

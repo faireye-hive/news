@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Shield, UserX, UserCheck, AlertCircle, RefreshCw, Search } from 'lucide-react';
 import { getVotingPower } from '../services/hiveEngineService';
+import LightAccountsAdmin from './LightAccountsAdmin';
 
 const AdminPanel: React.FC = () => {
   const { user, customJson } = useAuth();
@@ -11,6 +12,7 @@ const AdminPanel: React.FC = () => {
   const [isResetting, setIsResetting] = useState(false);
   const [userStatus, setUserStatus] = useState<any>(null);
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [activeTab, setActiveTab] = useState<'moderation' | 'light_accounts'>('moderation');
 
   // The admin account and reward pool ID specific to this tribe
   const ADMIN_ACCOUNT = 'faireye';
@@ -166,12 +168,31 @@ const AdminPanel: React.FC = () => {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden border border-gray-100 dark:border-gray-700">
-        <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 flex items-center space-x-3">
-          <Shield className="w-6 h-6 text-blue-500" />
-          <h2 className="text-xl font-bold text-gray-800 dark:text-white">Moderation Panel</h2>
+        <div className="px-6 py-5 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center space-x-3">
+            <Shield className="w-6 h-6 text-blue-500" />
+            <h2 className="text-xl font-bold text-gray-800 dark:text-white">Admin Panel</h2>
+          </div>
+          
+          <div className="flex bg-gray-200 dark:bg-gray-900 rounded-lg p-1">
+            <button 
+              onClick={() => setActiveTab('moderation')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'moderation' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            >
+              Moderation
+            </button>
+            <button 
+              onClick={() => setActiveTab('light_accounts')}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition-colors ${activeTab === 'light_accounts' ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
+            >
+              Light Accounts
+            </button>
+          </div>
         </div>
         
         <div className="p-6">
+          {activeTab === 'moderation' ? (
+            <>
           <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-800 dark:text-white mb-2">Mute / Unmute User</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -273,6 +294,10 @@ const AdminPanel: React.FC = () => {
               </button>
             </div>
           </div>
+        </>
+          ) : (
+            <LightAccountsAdmin />
+          )}
         </div>
       </div>
     </div>

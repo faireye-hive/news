@@ -1,3 +1,14 @@
+const getAuthorName = (post: any) => {
+  if (!post) return "";
+  try {
+    const meta = typeof post.json_metadata === "string" ? JSON.parse(post.json_metadata) : post.json_metadata;
+    if (meta && meta.author_nickname) {
+       return `${meta.author_nickname}`;
+    }
+  } catch (e) {}
+  return post.author;
+};
+
 import React, { useEffect, useState } from "react";
 import {
   getHivePosts,
@@ -1697,9 +1708,9 @@ const Explorer: React.FC = () => {
                       <div className={`flex flex-col flex-1 ${isFeatured ? "lg:py-8" : ""}`}>
                         <div className="flex items-center gap-2 mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">
                           <div className="flex items-center gap-2 min-w-0">
-                            <Link to={`/profile/${post.author}`} className="hover:text-white transition-colors flex items-center gap-2 min-w-0 shrink">
+                            <Link to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`} className="hover:text-white transition-colors flex items-center gap-2 min-w-0 shrink">
                               <img src={`https://images.hive.blog/u/${post.author}/avatar`} alt={post.author} className="w-6 h-6 rounded-full bg-slate-800 shrink-0" />
-                              <span className="truncate">{post.author}</span>
+                              <span className="truncate">{getAuthorName(post)}</span>
                             </Link>
                             {userFlairs[post.author] && (
                               <span className="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase border border-blue-700/50 shrink-0">
@@ -1795,7 +1806,7 @@ const Explorer: React.FC = () => {
                       <div className="flex items-center gap-1.5 sm:gap-3 mb-3">
                         <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0">
                           <Link
-                            to={`/profile/${post.author}`}
+                            to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`}
                             className="shrink-0"
                           >
                             <img
@@ -1805,10 +1816,10 @@ const Explorer: React.FC = () => {
                             />
                           </Link>
                           <Link
-                            to={`/profile/${post.author}`}
+                            to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`}
                             className="text-xs font-bold text-slate-300 hover:text-cent cursor-pointer truncate min-w-0"
                           >
-                            @{post.author}
+                            @{getAuthorName(post)}
                           </Link>
                           {userFlairs[post.author] && (
                             <span className="bg-blue-900/40 text-blue-300 px-1.5 py-0.5 rounded text-[10px] font-bold tracking-widest uppercase border border-blue-700/50 shrink-0">

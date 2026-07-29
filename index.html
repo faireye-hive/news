@@ -5,6 +5,53 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Hive Community Explorer</title>
     <script>
+      (function() {
+        try {
+          if (typeof window !== 'undefined') {
+            if (!window.global) window.global = window;
+            
+            var _realFetch = window.fetch;
+            var currentFetch = function() {
+              return _realFetch.apply(window, arguments);
+            };
+
+            var getter = function() {
+              return currentFetch;
+            };
+
+            var setter = function(fn) {
+              if (typeof fn === 'function') {
+                currentFetch = fn;
+              }
+            };
+
+            var targets = [window, globalThis];
+            if (typeof Window !== 'undefined' && Window.prototype) {
+              targets.push(Window.prototype);
+            }
+
+            targets.forEach(function(target) {
+              if (!target) return;
+              try {
+                var desc = Object.getOwnPropertyDescriptor(target, 'fetch');
+                if (desc) {
+                  try { delete target.fetch; } catch(e) {}
+                }
+                Object.defineProperty(target, 'fetch', {
+                  get: getter,
+                  set: setter,
+                  configurable: true,
+                  enumerable: true
+                });
+              } catch (err) {}
+            });
+          }
+        } catch (e) {
+          console.warn('Fetch property patch failed:', e);
+        }
+      })();
+    </script>
+    <script>
       // Single Page Apps for GitHub Pages URL restoration
       (function() {
         var redirect = sessionStorage.getItem('spa_redirect');

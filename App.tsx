@@ -1,10 +1,12 @@
 import React, { useState } from "react";
+import { createPortal } from "react-dom";
 import {
   BrowserRouter as Router,
   Routes,
   Route,
   Link,
   useLocation,
+  useNavigate,
 } from "react-router-dom";
 import Dashboard from "./components/Dashboard";
 import MarketPools from "./components/MarketPools";
@@ -16,6 +18,7 @@ import HiddenUsers from "./components/HiddenUsers";
 import CreatePost from "./components/CreatePost";
 import Settings from "./components/Settings";
 import Discovery from "./components/Discovery";
+import Register from "./components/Register";
 import {
   LayoutDashboard,
   Wallet,
@@ -25,6 +28,7 @@ import {
   LogIn,
   LogOut,
   User,
+  UserPlus,
   Edit3,
   Compass,
   Rss,
@@ -126,24 +130,31 @@ const MobileNavLink: React.FC<{
     </Link>
   );
 };
-
 const LoginButton: React.FC = () => {
-  const { user, login, logout, isKeychainInstalled } = useAuth();
+  const { user, lightAccount, login, loginLight, logout, isKeychainInstalled } = useAuth();
   const [usernameInput, setUsernameInput] = useState("");
+  const [privateKeyInput, setPrivateKeyInput] = useState("");
+  const [loginMode, setLoginMode] = useState<'keychain' | 'light'>('keychain');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!usernameInput) return;
     setLoading(true);
     try {
-      await login(usernameInput);
+      if (loginMode === 'keychain') {
+        if (!usernameInput) throw new Error("Username required");
+        await login(usernameInput);
+      } else {
+        if (!privateKeyInput) throw new Error("Private key required");
+        await loginLight(privateKeyInput);
+      }
       setIsModalOpen(false);
-    } catch (err) {
-      alert(t("login.error"));
+    } catch (err: any) {
+      alert(err.message || t("login.error"));
     }
     setLoading(false);
   };
@@ -161,7 +172,7 @@ const LoginButton: React.FC = () => {
             className="w-6 h-6 rounded-full border border-green-500"
           />
           <span className="text-sm font-bold text-white hidden sm:inline">
-            {user}
+            {lightAccount ? lightAccount.nickname : user}
           </span>
         </button>
 
@@ -193,7 +204,7 @@ const LoginButton: React.FC = () => {
               >
                 <User size={16} /> {t("nav.hiddenUsers")}
               </Link>
-                            <Link
+              <Link
                 to="/settings"
                 onClick={() => setMenuOpen(false)}
                 className="flex items-center gap-2 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors border-t border-slate-700/50"
@@ -236,12 +247,12 @@ const LoginButton: React.FC = () => {
         <span className="hidden sm:inline">{t("nav.login")}</span>
       </button>
 
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-card border border-slate-700 p-6 rounded-2xl w-full max-w-sm shadow-2xl animate-fade-in relative">
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-card border border-slate-700 p-6 sm:p-8 rounded-2xl w-full max-w-md shadow-2xl animate-fade-in relative my-auto max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setIsModalOpen(false)}
-              className="absolute top-4 right-4 text-slate-500 hover:text-white"
+              className="absolute top-4 right-4 text-slate-400 hover:text-white text-lg font-bold w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-800 transition-colors"
             >
               ✕
             </button>
@@ -250,46 +261,108 @@ const LoginButton: React.FC = () => {
               <User className="text-cent" /> {t("login.title")}
             </h3>
 
-            {!isKeychainInstalled ? (
-              <div className="text-red-400 text-sm mb-4">
-                {t("login.noKeychain")}
-                <a
-                  href="https://hive-keychain.com/"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block mt-2 underline text-white"
-                >
-                  {t("login.downloadKeychain")}
-                </a>
-              </div>
+            <div className="flex bg-slate-900 rounded-lg p-1 mb-6">
+              <button 
+                onClick={() => setLoginMode('keychain')}
+                className={`flex-1 py-2 px-3 rounded-md text-sm font-bold transition-colors ${loginMode === 'keychain' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Hive Keychain
+              </button>
+              <button 
+                onClick={() => setLoginMode('light')}
+                className={`flex-1 py-2 px-3 rounded-md text-sm font-bold transition-colors ${loginMode === 'light' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              >
+                Light Account
+              </button>
+            </div>
+
+            {loginMode === 'keychain' ? (
+              !isKeychainInstalled ? (
+                <div className="text-red-400 text-sm mb-4">
+                  {t("login.noKeychain")}
+                  <a
+                    href="https://hive-keychain.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="block mt-2 underline text-white"
+                  >
+                    {t("login.downloadKeychain")}
+                  </a>
+                </div>
+              ) : (
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-slate-400 text-xs uppercase mb-1 font-bold">
+                      {t("login.username")}
+                    </label>
+                    <input
+                      type="text"
+                      value={usernameInput}
+                      onChange={(e) =>
+                        setUsernameInput(e.target.value.toLowerCase())
+                      }
+                      placeholder="ex: hiveio"
+                      className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-cent outline-none font-medium"
+                      autoFocus
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={loading || !usernameInput}
+                    className="w-full bg-cent hover:bg-green-400 text-slate-900 font-bold py-3 rounded-lg transition-all disabled:opacity-50 text-sm uppercase tracking-wider"
+                  >
+                    {loading ? t("login.checking") : t("login.submit")}
+                  </button>
+                </form>
+              )
             ) : (
               <form onSubmit={handleLogin} className="space-y-4">
+                <div className="mb-4 text-xs text-slate-300">
+                  Login using your Light Account private key. This key starts with <strong>5...</strong>
+                </div>
                 <div>
-                  <label className="block text-slate-400 text-xs uppercase mb-1">
-                    {t("login.username")}
+                  <label className="block text-slate-400 text-xs uppercase mb-1 font-bold">
+                    Light Private Key
                   </label>
                   <input
-                    type="text"
-                    value={usernameInput}
-                    onChange={(e) =>
-                      setUsernameInput(e.target.value.toLowerCase())
-                    }
-                    placeholder="ex: hiveio"
-                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-cent outline-none"
+                    type="password"
+                    value={privateKeyInput}
+                    onChange={(e) => setPrivateKeyInput(e.target.value)}
+                    placeholder="5H..."
+                    className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 text-white focus:border-cent outline-none font-medium font-mono"
                     autoFocus
                   />
                 </div>
                 <button
                   type="submit"
-                  disabled={loading || !usernameInput}
-                  className="w-full bg-cent hover:bg-green-400 text-slate-900 font-bold py-3 rounded-lg transition-all disabled:opacity-50"
+                  disabled={loading || !privateKeyInput}
+                  className="w-full bg-cent hover:bg-green-400 text-slate-900 font-bold py-3 rounded-lg transition-all disabled:opacity-50 text-sm uppercase tracking-wider"
                 >
-                  {loading ? t("login.checking") : t("login.submit")}
+                  {loading ? t("login.checking") : "Login as Light Account"}
                 </button>
               </form>
             )}
+
+            {/* Register Option */}
+            <div className="mt-6 pt-5 border-t border-slate-700/70 text-center">
+              <p className="text-xs text-slate-400 mb-2.5">
+                {language === "pt" ? "Não possui uma conta Hive?" : "Don't have a Hive account?"}
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  navigate("/register");
+                }}
+                className="w-full bg-slate-800 hover:bg-slate-700 text-cent font-bold py-3 px-4 rounded-xl text-xs border border-slate-700 hover:border-cent transition-all flex items-center justify-center gap-2 shadow-sm"
+              >
+                <UserPlus size={16} />
+                {language === "pt" ? "Criar Conta Grátis na Hive" : "Create Free Hive Account"}
+              </button>
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
@@ -423,6 +496,7 @@ const AppContent: React.FC = () => {
           <Route path="/hidden-users" element={<HiddenUsers />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/register" element={<Register />} />
           <Route path="/create-post" element={<CreatePost />} />
           <Route path="/post/:author/:permlink" element={<SinglePost />} />
           <Route path="/:author/:permlink" element={<SinglePost />} />
