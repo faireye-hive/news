@@ -97,21 +97,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const loginLight = async (privateKeyStr: string) => {
-    let guestAccount = ((import.meta as any).env?.VITE_GUEST_ACCOUNT as string) || '';
-
-    if (!guestAccount) {
-      try {
-        const res = await fetch('/api/config');
-        if (res.ok) {
-          const cfg = await res.json();
-          if (cfg.guestAccount) guestAccount = cfg.guestAccount;
-        }
-      } catch (e) {}
-    }
-
-    if (!guestAccount) {
-      guestAccount = 'hive.micro';
-    }
+    const envGuestAccountsStr = ((import.meta as any).env?.VITE_GUEST_ACCOUNT as string) || 'cent-light';
+    const guestAccounts = envGuestAccountsStr.split(',').map((s: string) => s.trim()).filter(Boolean);
 
     let privKey: PrivateKey;
     try {
@@ -121,27 +108,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const pubKeyStr = privKey.createPublic().toString();
+    const accounts = await hiveClient.database.getAccounts(guestAccounts);
+    
+    let authorizedAccount = null;
     let nickname = 'Guest';
 
-    try {
-      const accounts = await hiveClient.database.getAccounts([guestAccount]);
-      const account = accounts[0];
-      if (account) {
+    for (const account of accounts) {
+      const auths = account.posting.key_auths as [string, number][];
+      const isAuthorized = auths.some((auth) => auth[0] === pubKeyStr);
+      if (isAuthorized) {
+        authorizedAccount = account;
         let metadata = {};
         try {
           metadata = JSON.parse(account.posting_json_metadata || '{}');
         } catch (e) {}
-        if ((metadata as any).light_accounts?.[pubKeyStr]) {
-          nickname = (metadata as any).light_accounts[pubKeyStr];
-        }
+        nickname = (metadata as any).light_accounts?.[pubKeyStr] || 'Guest';
+        break;
       }
-    } catch (e) {
-      console.warn("Could not fetch guest account metadata from Hive:", e);
     }
 
-    const lightUser = { nickname, privateKey: privateKeyStr, guestAccount };
+    if (!authorizedAccount) {
+      throw new Error("This key is not registered as a light account");
+    }
+
+    const lightUser = { nickname, privateKey: privateKeyStr, guestAccount: authorizedAccount.name };
     setLightAccount(lightUser);
-    setUser(guestAccount);
+    setUser(authorizedAccount.name);
     localStorage.setItem('cent_light_user', JSON.stringify(lightUser));
     localStorage.removeItem('cent_user');
   };
@@ -178,10 +170,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const comment = async (parentAuthor: string, parentPermlink: string, title: string, body: string, tags: string[], declinePayout: boolean = false): Promise<KeychainResponse> => {
     const cleanTitle = title.trim();
-    const permlink = cleanTitle 
+    let permlink = cleanTitle 
       ? cleanTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now()
       : 're-' + parentPermlink + '-' + Date.now();
       
+    if (lightAccount) {
+      const pubKey = PrivateKey.fromString(lightAccount.privateKey).createPublic().toString();
+      const msgUint8 = new TextEncoder().encode(pubKey);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const keyPrefix = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 10);
+      
+      permlink = `u-${keyPrefix}-${permlink}`;
+    }
+
     const metadata = {
       tags: tags,
       app: 'news',
@@ -213,7 +215,47 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     if (lightAccount) {
-      return broadcastLightOperations(operations);
+      try {
+        const privKey = PrivateKey.fromString(lightAccount.privateKey);
+        const pubKeyStr = privKey.createPublic().toString();
+
+        const props = await hiveClient.database.getDynamicGlobalProperties();
+        const ref_block_num = props.head_block_number & 0xFFFF;
+        const head_block_id = props.head_block_id;
+        const ref_block_prefix = parseInt(head_block_id.slice(14, 16) + head_block_id.slice(12, 14) + head_block_id.slice(10, 12) + head_block_id.slice(8, 10), 16);
+        const expiration = new Date(new Date(props.time + 'Z').getTime() + 60 * 1000).toISOString().slice(0, -5);
+        
+        const tx = {
+            ref_block_num,
+            ref_block_prefix,
+            expiration,
+            operations,
+            extensions: []
+        };
+        
+        const signedTx = hiveClient.broadcast.sign(tx, privKey);
+        const signatureLight = signedTx.signatures[0];
+
+        const workerResponse = await fetch("https://hive-light-api.faireye.workers.dev/sign-and-broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            publicLightKey: pubKeyStr,
+            signatureLight: signatureLight,
+            tx: tx
+          })
+        });
+
+        if (!workerResponse.ok) {
+          const errJson = await workerResponse.json().catch(() => ({}));
+          throw new Error(errJson.error || "Failed to broadcast");
+        }
+
+        return { success: true, msg: 'Commented successfully via Worker' };
+      } catch (err: any) {
+        console.error(err);
+        return { success: false, msg: err.message };
+      }
     }
 
     return new Promise((resolve) => {
@@ -233,49 +275,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
-  const broadcastLightOperations = async (operations: any[]): Promise<KeychainResponse> => {
-    if (!lightAccount) return { success: false, msg: 'No light account logged in' };
-
-    // 1. Try serverless function (/api/light-broadcast) so master posting key stays on Cloudflare Functions server
-    try {
-      const response = await fetch('/api/light-broadcast', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          operations,
-          lightPrivateKey: lightAccount.privateKey,
-          guestAccount: lightAccount.guestAccount
-        })
-      });
-
-      if (response.ok) {
-        const json = await response.json();
-        if (json.success) {
-          return { success: true, msg: json.msg || 'Broadcasted via Cloudflare Serverless Function' };
-        }
-      }
-    } catch (e) {
-      // Endpoint not found or network error, fallback to client side
-    }
-
-    // 2. Client-side fallback if VITE_GUEST_POSTING_KEY is provided in client bundle
-    try {
-      const guestPostingKey = ((import.meta as any).env?.VITE_GUEST_POSTING_KEY as string) || '';
-      if (!guestPostingKey) {
-        throw new Error("Master posting key not configured. Set GUEST_POSTING_KEY in Cloudflare Pages environment variables.");
-      }
-
-      const privKey = PrivateKey.fromString(lightAccount.privateKey);
-      const masterKey = PrivateKey.fromString(guestPostingKey);
-
-      await hiveClient.broadcast.sendOperations(operations, [privKey, masterKey]);
-      return { success: true, msg: 'Operation broadcasted successfully' };
-    } catch (err: any) {
-      console.error(err);
-      return { success: false, msg: err.message };
-    }
-  };
-
   const customJson = async (id: string, json: any, display_name: string, keyType: 'Posting' | 'Active' = 'Posting'): Promise<KeychainResponse> => {
     if (lightAccount) {
       if (id === 'follow' || (Array.isArray(json) && json[0] === 'follow') || (typeof json === 'object' && json?.id === 'follow')) {
@@ -284,16 +283,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (keyType === 'Active') {
         return { success: false, msg: "Light accounts cannot perform Active key operations" };
       }
-      const enrichedJson = { ...json, author_nickname: lightAccount.nickname };
+      try {
+        const privKey = PrivateKey.fromString(lightAccount.privateKey);
+        const pubKeyStr = privKey.createPublic().toString();
+        
+        // Append nickname context if it's a social action (like follow)
+        const enrichedJson = { ...json, author_nickname: lightAccount.nickname };
 
-      const op: any[] = ['custom_json', {
-        required_auths: [],
-        required_posting_auths: [lightAccount.guestAccount],
-        id,
-        json: JSON.stringify(enrichedJson)
-      }];
+        const operations: any[] = [['custom_json', {
+          required_auths: [],
+          required_posting_auths: [lightAccount.guestAccount],
+          id,
+          json: JSON.stringify(enrichedJson)
+        }]];
 
-      return broadcastLightOperations([op]);
+        const props = await hiveClient.database.getDynamicGlobalProperties();
+        const ref_block_num = props.head_block_number & 0xFFFF;
+        const head_block_id = props.head_block_id;
+        const ref_block_prefix = parseInt(head_block_id.slice(14, 16) + head_block_id.slice(12, 14) + head_block_id.slice(10, 12) + head_block_id.slice(8, 10), 16);
+        const expiration = new Date(new Date(props.time + 'Z').getTime() + 60 * 1000).toISOString().slice(0, -5);
+        
+        const tx = {
+            ref_block_num,
+            ref_block_prefix,
+            expiration,
+            operations,
+            extensions: []
+        };
+        
+        const signedTx = hiveClient.broadcast.sign(tx, privKey);
+        const signatureLight = signedTx.signatures[0];
+
+        const workerResponse = await fetch("https://hive-light-api.faireye.workers.dev/sign-and-broadcast", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            publicLightKey: pubKeyStr,
+            signatureLight: signatureLight,
+            tx: tx
+          })
+        });
+
+        if (!workerResponse.ok) {
+          const errJson = await workerResponse.json().catch(() => ({}));
+          throw new Error(errJson.error || "Failed to broadcast");
+        }
+
+        return { success: true, msg: 'Custom JSON broadcasted via Worker' };
+      } catch (err: any) {
+        console.error(err);
+        return { success: false, msg: err.message };
+      }
     }
 
     return new Promise((resolve) => {

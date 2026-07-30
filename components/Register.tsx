@@ -98,10 +98,8 @@ export const Register: React.FC = () => {
   const envCreatorKey = ((import.meta as any).env?.VITE_CREATOR_ACTIVE_KEY as string) || '';
 
   const envGuestAccountsStr = ((import.meta as any).env?.VITE_GUEST_ACCOUNT as string) || '';
-  const envGuestActiveKeysStr = ((import.meta as any).env?.VITE_GUEST_ACTIVE_KEY as string) || '';
   
   const guestAccounts = envGuestAccountsStr.split(',').map(s => s.trim()).filter(Boolean);
-  const guestActiveKeys = envGuestActiveKeysStr.split(',').map(s => s.trim()).filter(Boolean);
 
   const [creatorAccount, setCreatorAccount] = useState(envCreatorAccount);
   const [creatorActiveKey, setCreatorActiveKey] = useState(envCreatorKey);
@@ -258,92 +256,25 @@ INSTRUCTIONS:
     try {
       const pubKeyStr = PrivateKey.fromString(lightPrivateKey).createPublic().toString();
 
-      // 1. Try serverless function endpoint first (/api/register-light-account)
-      try {
-        const res = await fetch('/api/register-light-account', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pubKeyStr, nickname })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.success) {
-            setAssignedGuestAccount(data.guestAccount || 'hive.micro');
-            setCreatedSuccess(true);
-            return;
-          }
-        }
-      } catch (e) {
-        // Fallback to client side if serverless route not available
+      const workerResponse = await fetch("https://hive-light-api.faireye.workers.dev/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          publicLightKey: pubKeyStr,
+          nickname: nickname
+        })
+      });
+
+      const jsonResponse = await workerResponse.json().catch(() => ({}));
+
+      if (!workerResponse.ok) {
+        throw new Error(jsonResponse.error || "Failed to register light account on server.");
       }
+      
+      // Fallback if VITE_GUEST_ACCOUNT is a list
+      const guestAcc = guestAccounts[0] || 'cent-light'; // Ensure this matches the server's HIVE_MAIN_ACCOUNT
 
-      // 2. Client-side registration if VITE_GUEST_ACCOUNT & VITE_GUEST_ACTIVE_KEY are present
-      if (guestAccounts.length > 0 && guestActiveKeys.length > 0 && guestAccounts.length === guestActiveKeys.length) {
-        let selectedAccountObj = null;
-        let selectedAccountName = '';
-        let selectedActiveKey = '';
-
-        const accountsData = await hiveClient.database.getAccounts(guestAccounts);
-
-        for (let i = 0; i < accountsData.length; i++) {
-          const acc = accountsData[i];
-          if (acc.posting.key_auths.length < 40) {
-            selectedAccountObj = acc;
-            selectedAccountName = guestAccounts[i];
-            selectedActiveKey = guestActiveKeys[i];
-            break;
-          }
-        }
-
-        if (!selectedAccountObj) {
-          throw new Error("All configured guest accounts are full. Please ask the administrator to add more.");
-        }
-
-        const account = selectedAccountObj;
-
-        // Update Posting Auth
-        const newPosting = { ...account.posting };
-        const authExists = newPosting.key_auths.some((auth: any) => auth[0] === pubKeyStr);
-
-        if (!authExists) {
-          newPosting.key_auths.push([pubKeyStr, 1]);
-          newPosting.key_auths.sort((a: any, b: any) => a[0].localeCompare(b[0]));
-        }
-
-        // Update Metadata
-        let metadata: any = {};
-        try {
-          metadata = JSON.parse(account.posting_json_metadata || '{}');
-        } catch (e) {}
-
-        metadata.light_accounts = metadata.light_accounts || {};
-        metadata.light_accounts[pubKeyStr] = nickname;
-
-        const updateOp: any = [
-          'account_update2',
-          {
-            account: selectedAccountName,
-            owner: undefined,
-            active: undefined,
-            posting: newPosting,
-            memo_key: account.memo_key,
-            json_metadata: account.json_metadata,
-            posting_json_metadata: JSON.stringify(metadata),
-            extensions: []
-          }
-        ];
-
-        const pKey = PrivateKey.fromString(selectedActiveKey);
-        await hiveClient.broadcast.sendOperations([updateOp], pKey);
-
-        setAssignedGuestAccount(selectedAccountName);
-        setCreatedSuccess(true);
-        return;
-      }
-
-      // 3. Fallback for default master guest account (e.g., hive.micro)
-      const targetGuest = guestAccounts[0] || envGuestAccountsStr || 'hive.micro';
-      setAssignedGuestAccount(targetGuest);
+      setAssignedGuestAccount(guestAcc);
       setCreatedSuccess(true);
     } catch (err: any) {
       console.error(err);
