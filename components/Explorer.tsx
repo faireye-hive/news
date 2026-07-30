@@ -210,7 +210,7 @@ const getPostTags = (post: HivePost): string[] => {
 };
 
 const Explorer: React.FC = () => {
-  const { user, vote, customJson } = useAuth();
+  const { user, lightAccount, vote, customJson } = useAuth();
   const { community } = useCommunity();
   const { t, language } = useLanguage();
   const [, setSearchParams] = useSearchParams();
@@ -627,6 +627,10 @@ const Explorer: React.FC = () => {
   }, [sort, community, tag]);
 
   const handleVoteClick = (post: HivePost) => {
+    if (lightAccount) {
+      alert("Light accounts cannot vote.");
+      return;
+    }
     if (!user) {
       alert("Faça login para votar!");
       return;
@@ -640,6 +644,11 @@ const Explorer: React.FC = () => {
   };
 
   const handleConfirmVote = async (weight: number) => {
+    if (lightAccount) {
+      alert("Light accounts cannot vote.");
+      setVoteModalPost(null);
+      return;
+    }
     if (!voteModalPost || !user) return;
     
     setVotingPost(voteModalPost.permlink);
@@ -1308,7 +1317,8 @@ const Explorer: React.FC = () => {
                          <div className="flex items-center gap-4">
                            <button
                              onClick={() => handleVoteClick(highlightPost)}
-                             disabled={userHasVoted || isVotingThis}
+                             disabled={userHasVoted || isVotingThis || !!lightAccount}
+                             title={lightAccount ? "Light accounts cannot vote" : ""}
                              className={`flex items-center gap-1.5 transition-colors ${userHasVoted ? "text-hive" : "hover:text-hive"}`}
                            >
                              {isVotingThis ? (
@@ -1533,7 +1543,8 @@ const Explorer: React.FC = () => {
                               <div className="flex items-center gap-1.5 sm:gap-3">
                                 <button
                                   onClick={() => handleVoteClick(catPost)}
-                                  disabled={userHasVoted || isVotingThis}
+                                  disabled={userHasVoted || isVotingThis || !!lightAccount}
+                                  title={lightAccount ? "Light accounts cannot vote" : ""}
                                   className={`flex items-center gap-1.5 text-xs font-semibold hover:text-hive transition-colors ${userHasVoted ? "text-hive" : "text-slate-400"}`}
                                 >
                                   {isVotingThis ? (
@@ -1737,8 +1748,9 @@ const Explorer: React.FC = () => {
                           <div className="flex items-center gap-4">
                             <button
                               onClick={() => handleVoteClick(post)}
-                              disabled={userHasVoted || isVotingThis}
-                              className={`flex items-center gap-1.5 transition-colors ${userHasVoted ? "text-hive" : "hover:text-hive"}`}
+                              disabled={userHasVoted || isVotingThis || !!lightAccount}
+                              title={lightAccount ? "Light accounts cannot vote" : ""}
+                              className={`flex items-center gap-1.5 transition-colors ${userHasVoted ? "text-hive" : "hover:text-hive"} ${lightAccount ? "opacity-50 cursor-not-allowed" : ""}`}
                             >
                               {isVotingThis ? (
                                 <Loader2 size={16} className="animate-spin" />
@@ -1864,14 +1876,14 @@ const Explorer: React.FC = () => {
                           <div className="flex items-center gap-1.5 transition-colors">
                             <button
                               onClick={() => handleVoteClick(post)}
-                              disabled={userHasVoted || isVotingThis}
+                              disabled={userHasVoted || isVotingThis || !!lightAccount}
                               className={`${
                                 userHasVoted
                                   ? "text-green-400"
                                   : "hover:text-green-300 text-slate-400"
-                              }`}
+                              } ${lightAccount ? "opacity-50 cursor-not-allowed" : ""}`}
                               title={
-                                userHasVoted ? "Você já votou" : "Votar 100%"
+                                lightAccount ? "Light accounts cannot vote" : (userHasVoted ? "Você já votou" : "Votar 100%")
                               }
                             >
                               {isVotingThis ? (

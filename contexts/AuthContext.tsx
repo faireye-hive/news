@@ -142,26 +142,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const vote = async (author: string, permlink: string, weight: number): Promise<KeychainResponse> => {
     if (lightAccount) {
-      try {
-        const guestPostingKey = ((import.meta as any).env?.VITE_GUEST_POSTING_KEY as string) || '';
-        if (!guestPostingKey) throw new Error("Master posting key not configured");
-        
-        const privKey = PrivateKey.fromString(lightAccount.privateKey);
-        const masterKey = PrivateKey.fromString(guestPostingKey);
-
-        const op: any[] = ['vote', {
-          voter: lightAccount.guestAccount,
-          author,
-          permlink,
-          weight
-        }];
-
-        await hiveClient.broadcast.sendOperations([op], [privKey, masterKey]);
-        return { success: true, msg: 'Voted successfully' };
-      } catch (err: any) {
-        console.error(err);
-        return { success: false, msg: err.message };
-      }
+      return { success: false, msg: "Light accounts cannot vote" };
     }
 
     return new Promise((resolve) => {
@@ -253,6 +234,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const customJson = async (id: string, json: any, display_name: string, keyType: 'Posting' | 'Active' = 'Posting'): Promise<KeychainResponse> => {
     if (lightAccount) {
+      if (id === 'follow' || (Array.isArray(json) && json[0] === 'follow') || (typeof json === 'object' && json?.id === 'follow')) {
+        return { success: false, msg: "Light accounts cannot follow users" };
+      }
       if (keyType === 'Active') {
         return { success: false, msg: "Light accounts cannot perform Active key operations" };
       }

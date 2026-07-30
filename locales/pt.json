@@ -258,5 +258,26 @@
     "notFound": "Dados de poder de voto não encontrados.",
     "confirmUpvote": "Confirmar Upvote",
     "confirmDownvote": "Confirmar Downvote"
+  },
+  "lightProfile": {
+    "editBtn": "Editar Perfil Light",
+    "title": "Configurações da Light Account",
+    "subtitle": "Personalize a foto de perfil, capa, nome e biografia de @{nickname}",
+    "noCover": "Nenhuma imagem de capa definida",
+    "displayName": "Nome de Exibição",
+    "displayNamePlaceholder": "Ex: João Silva",
+    "profileImage": "URL da Foto de Perfil (Avatar)",
+    "profileImageHint": "Cole o link direto da sua imagem de perfil (PNG, JPG, WEBP)",
+    "coverImage": "URL da Imagem de Capa (Background)",
+    "coverImageHint": "Cole o link da imagem de banner que ficará ao fundo do seu perfil",
+    "about": "Sobre mim / Breve Descrição",
+    "aboutPlaceholder": "Escreva uma breve apresentação...",
+    "cancel": "Cancelar",
+    "save": "Salvar Alterações",
+    "saving": "Salvando...",
+    "success": "Perfil da Light Account salvo com sucesso!",
+    "errorSave": "Erro ao salvar perfil: ",
+    "errorUnexpected": "Erro inesperado: ",
+    "updateTxMemo": "Atualizar Perfil @{nickname}"
   }
 }

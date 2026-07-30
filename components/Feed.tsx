@@ -10,6 +10,7 @@ import { Link, Navigate, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import { extractImage } from '../utils/image';
 import VoteModal from './VoteModal';
+import { getAuthorAvatarUrl } from '../utils/lightAccount';
 import { VotersModal } from './VotersModal';
 
 const getAuthorName = (post: HivePost) => {
@@ -23,7 +24,7 @@ const getAuthorName = (post: HivePost) => {
 };
 
 const Feed: React.FC = () => {
-  const { user, vote } = useAuth();
+  const { user, lightAccount, vote } = useAuth();
   const { t } = useLanguage();
   const { community } = useCommunity();
   const location = useLocation();
@@ -57,7 +58,7 @@ const Feed: React.FC = () => {
     }
     const alreadyVoted = post.active_votes?.some((v) => v.voter === user);
     if (alreadyVoted) {
-      alert(t('feed.error') + "Você já votou neste post.");
+      alert(t('feed.error') + "You have already voted on this post.");
       return;
     }
     setVoteModalPost(post);
@@ -157,9 +158,9 @@ const Feed: React.FC = () => {
                   <div className="flex items-center gap-2 mb-3 h-8">
                      <Link to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity min-w-0">
                         <img 
-                           src={`https://images.hive.blog/u/${post.author}/avatar`} 
+                           src={getAuthorAvatarUrl(post.author, getAuthorName(post) !== post.author ? getAuthorName(post) : undefined, post.json_metadata)} 
                            alt={post.author}
-                           className="w-6 h-6 rounded-full bg-slate-800 shrink-0"
+                           className="w-6 h-6 rounded-full bg-slate-800 shrink-0 object-cover"
                         />
                         <span className="font-bold text-slate-200 truncate">{getAuthorName(post)}</span>
                      </Link>
@@ -178,17 +179,24 @@ const Feed: React.FC = () => {
                   <div className="flex items-center justify-between pt-4 border-t border-slate-700/30">
                      <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-all hover:bg-slate-800">
-                           <button 
-                              onClick={() => handleVoteClick(post)}
-                              disabled={votingPost === post.permlink}
-                              className={`${upvoted ? 'text-cent' : 'text-slate-400 hover:text-white'} disabled:opacity-50`}
-                           >
-                              {votingPost === post.permlink ? (
-                                 <Loader2 size={16} className="animate-spin" />
-                              ) : (
-                                 <Heart size={16} className={upvoted ? "fill-cent" : ""} />
-                              )}
-                           </button>
+                           {!lightAccount && (
+                             <button 
+                                onClick={() => handleVoteClick(post)}
+                                disabled={votingPost === post.permlink}
+                                className={`${upvoted ? 'text-cent' : 'text-slate-400 hover:text-white'} disabled:opacity-50`}
+                             >
+                                {votingPost === post.permlink ? (
+                                   <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                   <Heart size={16} className={upvoted ? "fill-cent" : ""} />
+                                )}
+                             </button>
+                           )}
+                           {lightAccount && (
+                             <div className="text-slate-500 cursor-not-allowed" title="Light accounts cannot vote">
+                               <Heart size={16} />
+                             </div>
+                           )}
                            <button
                               onClick={() => setVotersModalPost(post)}
                               className="text-slate-400 hover:text-white font-medium"

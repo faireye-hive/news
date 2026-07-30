@@ -19,7 +19,7 @@ const Settings: React.FC = () => {
           <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800">
             <h3 className="text-lg font-bold text-white mb-2">Comunidade Principal (Token)</h3>
             <p className="text-sm text-slate-400 mb-4">
-              Escolha qual comunidade você deseja explorar por padrão. 
+              Choose which community you want to explore by default. 
               Isso afeta os feeds, a recompensa exibida e a exibição de tokens.
             </p>
             

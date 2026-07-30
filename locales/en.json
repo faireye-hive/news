@@ -258,5 +258,26 @@
     "notFound": "Voting power data not found.",
     "confirmUpvote": "Confirm Upvote",
     "confirmDownvote": "Confirm Downvote"
+  },
+  "lightProfile": {
+    "editBtn": "Edit Light Profile",
+    "title": "Light Account Settings",
+    "subtitle": "Customize avatar, cover, name, and bio for @{nickname}",
+    "noCover": "No cover image set",
+    "displayName": "Display Name",
+    "displayNamePlaceholder": "e.g. John Doe",
+    "profileImage": "Profile Picture URL (Avatar)",
+    "profileImageHint": "Paste direct link to your avatar image (PNG, JPG, WEBP)",
+    "coverImage": "Cover Image URL (Background)",
+    "coverImageHint": "Paste direct link to the banner image for your profile background",
+    "about": "About Me / Short Bio",
+    "aboutPlaceholder": "Write a short introduction...",
+    "cancel": "Cancel",
+    "save": "Save Changes",
+    "saving": "Saving...",
+    "success": "Light Account profile saved successfully!",
+    "errorSave": "Error saving profile: ",
+    "errorUnexpected": "Unexpected error: ",
+    "updateTxMemo": "Update Profile @{nickname}"
   }
 }

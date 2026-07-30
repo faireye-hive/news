@@ -6,6 +6,17 @@ const getAuthorName = (post: any) => {
        return `${meta.author_nickname}`;
     }
   } catch (e) {}
+
+  try {
+    const storedLight = localStorage.getItem('hive_light_account');
+    if (storedLight) {
+      const parsed = JSON.parse(storedLight);
+      if (parsed && parsed.guestAccount === post.author && parsed.nickname) {
+        return parsed.nickname;
+      }
+    }
+  } catch (e) {}
+
   return post.author;
 };
 
@@ -47,6 +58,7 @@ import { useHiddenUsers } from "../utils/hiddenUsers";
 import { useLanguage } from "../contexts/LanguageContext";
 import VoteModal from "./VoteModal";
 import { VotersModal } from "./VotersModal";
+import { getAuthorAvatarUrl } from "../utils/lightAccount";
 
 // Helper component for individual comments
 const CommentItem: React.FC<{
@@ -54,9 +66,10 @@ const CommentItem: React.FC<{
   tribeInfo: TribeInfo | null;
   readerSettings: any;
   postAuthor: string;
-}> = ({ comment, tribeInfo, readerSettings, postAuthor }) => {
+  postAuthorName?: string;
+}> = ({ comment, tribeInfo, readerSettings, postAuthor, postAuthorName }) => {
   const [html, setHtml] = useState("");
-  const { user, vote, comment: postComment } = useAuth();
+  const { user, lightAccount, vote, comment: postComment } = useAuth();
   const { community } = useCommunity();
   const { hiddenUsers, hideUser } = useHiddenUsers();
   const [isVoting, setIsVoting] = useState(false);
@@ -204,6 +217,10 @@ const CommentItem: React.FC<{
   };
 
   const handleVoteClick = () => {
+    if (lightAccount) {
+      alert("Light accounts cannot vote.");
+      return;
+    }
     if (!user) {
       alert("Faça login para votar!");
       return;
@@ -262,7 +279,35 @@ const CommentItem: React.FC<{
         declinePayout,
       );
       if (result.success) {
-        alert("Resposta publicada com sucesso!");
+        const authorAccount = lightAccount ? lightAccount.guestAccount : user;
+        const authorNickname = lightAccount ? lightAccount.nickname : undefined;
+        const permlink = `re-${localComment.permlink}-${Date.now()}`;
+
+        const newReply: HivePost = {
+          author: authorAccount,
+          permlink: permlink,
+          parent_author: localComment.author,
+          parent_permlink: localComment.permlink,
+          title: "",
+          body: replyText,
+          json_metadata: JSON.stringify({
+            tags: ["news"],
+            app: "news",
+            ...(authorNickname ? { author_nickname: authorNickname } : {})
+          }),
+          created: new Date().toISOString().replace("Z", ""),
+          active_votes: [],
+          net_votes: 0,
+          children: 0,
+          pending_token: 0,
+          precision: 2,
+          category: localComment.category || "news",
+          depth: (localComment.depth || 0) + 1,
+        };
+
+        setReplies((prev) => [...prev, newReply]);
+        setShowReplies(true);
+        setLocalComment((prev) => ({ ...prev, children: (prev.children || 0) + 1 }));
         setShowReplyBox(false);
         setReplyText("");
       } else {
@@ -278,6 +323,9 @@ const CommentItem: React.FC<{
   const userHasVoted =
     user && localComment.active_votes?.some((v) => v.voter === user);
   const netVotes = localComment.net_votes || 0;
+  const isPostAuthor =
+    localComment.author === postAuthor &&
+    getAuthorName(localComment) === (postAuthorName || postAuthor);
 
   if (hiddenUsers.includes(localComment.author)) {
     return null;
@@ -288,22 +336,22 @@ const CommentItem: React.FC<{
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <img
-            src={`https://images.hive.blog/u/${localComment.author}/avatar`}
+            src={getAuthorAvatarUrl(localComment.author, getAuthorName(localComment) !== localComment.author ? getAuthorName(localComment) : undefined, localComment.json_metadata)}
             alt={localComment.author}
-            className="w-8 h-8 rounded-full border border-slate-600"
+            className="w-8 h-8 rounded-full border border-slate-600 object-cover"
             onError={(e) =>
-              ((e.target as HTMLImageElement).src = "https://placehold.co/32")
+              ((e.target as HTMLImageElement).src = `https://images.hive.blog/u/${localComment.author}/avatar`)
             }
           />
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 min-w-0 flex-wrap">
               <Link
-                to={`/profile/${localComment.author}`}
+                to={`/profile/${localComment.author}${getAuthorName(localComment) !== localComment.author ? '?nickname=' + encodeURIComponent(getAuthorName(localComment)) : ''}`}
                 className="font-bold text-slate-300 text-sm hover:text-cent transition-colors truncate"
               >
-                @{localComment.author}
+                @{getAuthorName(localComment)}
               </Link>
-              {localComment.author === postAuthor && (
+              {isPostAuthor && (
                 <span className="bg-cent/10 text-cent px-1.5 py-0.5 rounded text-[10px] font-bold uppercase border border-cent/20 shrink-0">
                   Autor
                 </span>
@@ -323,7 +371,7 @@ const CommentItem: React.FC<{
           <button
             onClick={() => hideUser(localComment.author)}
             className="text-xs text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-            title="Ocultar comentários deste usuário"
+            title="Hide comments from this user"
           >
             Ocultar
           </button>
@@ -365,7 +413,7 @@ const CommentItem: React.FC<{
           <textarea
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            placeholder={`Respondendo a @${localComment.author}...`}
+            placeholder={`Respondendo a @${getAuthorName(localComment)}...`}
             className="w-full bg-slate-900 border border-slate-700 p-3 rounded-lg text-white focus:outline-none focus:border-cent text-sm min-h-[80px]"
             disabled={isReplying}
           />
@@ -427,6 +475,7 @@ const CommentItem: React.FC<{
                     tribeInfo={tribeInfo}
                     readerSettings={readerSettings}
                     postAuthor={postAuthor}
+                    postAuthorName={postAuthorName}
                   />
                 ))
               )}
@@ -460,7 +509,7 @@ const SinglePost: React.FC = () => {
     : rawAuthor;
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, vote } = useAuth();
+  const { user, lightAccount, vote } = useAuth();
   const { t } = useLanguage();
 
   const isModal = Boolean(location.state?.backgroundLocation);
@@ -741,6 +790,10 @@ const SinglePost: React.FC = () => {
   };
 
   const handleVoteClick = () => {
+    if (lightAccount) {
+      alert("Light accounts cannot vote.");
+      return;
+    }
     if (!user) {
       alert("Faça login para votar!");
       return;
@@ -803,14 +856,39 @@ const SinglePost: React.FC = () => {
         declinePayout,
       );
       if (result.success) {
-        alert(
-          "Comentário publicado! Atualize a página em alguns instantes para ver seu comentário.",
-        );
+        const authorAccount = lightAccount ? lightAccount.guestAccount : user;
+        const authorNickname = lightAccount ? lightAccount.nickname : undefined;
+        const permlink = `re-${post.permlink}-${Date.now()}`;
+
+        const newComment: HivePost = {
+          author: authorAccount,
+          permlink: permlink,
+          parent_author: post.author,
+          parent_permlink: post.permlink,
+          title: "",
+          body: replyText,
+          json_metadata: JSON.stringify({
+            tags: ["news"],
+            app: "news",
+            ...(authorNickname ? { author_nickname: authorNickname } : {})
+          }),
+          created: new Date().toISOString().replace("Z", ""),
+          active_votes: [],
+          net_votes: 0,
+          children: 0,
+          pending_token: 0,
+          precision: 2,
+          category: post.category || "news",
+          depth: 1,
+        };
+
+        setComments((prev) => [newComment, ...prev]);
+        setPost((prev) => prev ? { ...prev, children: (prev.children || 0) + 1 } : null);
         setReplyText("");
-        // Reload comments after a brief delay
+
         setTimeout(() => {
           if (author && permlink) loadComments(author, permlink);
-        }, 3000);
+        }, 5000);
       } else {
         alert("Erro ao comentar: " + result.msg);
       }
@@ -971,9 +1049,9 @@ const SinglePost: React.FC = () => {
             <div className="flex items-center gap-3">
               <Link to={`/profile/${post.author}${getAuthorName(post) !== post.author ? '?nickname=' + encodeURIComponent(getAuthorName(post)) : ''}`}>
                 <img
-                  src={`https://images.hive.blog/u/${post.author}/avatar`}
+                  src={getAuthorAvatarUrl(post.author, getAuthorName(post) !== post.author ? getAuthorName(post) : undefined, post.json_metadata)}
                   alt={post.author}
-                  className="w-10 h-10 rounded-full border border-slate-500 hover:border-cent transition-colors"
+                  className="w-10 h-10 rounded-full border border-slate-500 hover:border-cent transition-colors object-cover"
                 />
               </Link>
               <div className="flex flex-col items-start">
@@ -1302,12 +1380,12 @@ const SinglePost: React.FC = () => {
             <div className="mb-8 p-4 rounded-xl border border-slate-700 bg-slate-800/50">
               <div className="flex gap-3">
                 <img
-                  src={`https://images.hive.blog/u/${user}/avatar`}
+                  src={getAuthorAvatarUrl(user, lightAccount?.nickname)}
                   alt={user}
-                  className="w-10 h-10 rounded-full border border-slate-600"
+                  className="w-10 h-10 rounded-full border border-slate-600 object-cover"
                   onError={(e) =>
                     ((e.target as HTMLImageElement).src =
-                      "https://placehold.co/40")
+                      `https://images.hive.blog/u/${user}/avatar`)
                   }
                 />
                 <div className="flex-1">
@@ -1367,6 +1445,7 @@ const SinglePost: React.FC = () => {
                   tribeInfo={tribeInfo}
                   readerSettings={readerSettings}
                   postAuthor={post?.author || ''}
+                  postAuthorName={post ? getAuthorName(post) : ''}
                 />
               ))}
             </div>

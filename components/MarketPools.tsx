@@ -337,11 +337,11 @@ const MarketPools: React.FC = () => {
         setTimeout(refreshData, 6000);
         setTimeout(refreshData, 10000);
       } else {
-        alert("Erro no Swap: " + res.msg);
+        alert("Swap Error: " + res.msg);
       }
     } catch (err: any) {
       console.error(err);
-      alert("Ocorreu um erro: " + err.message);
+      alert("An error occurred: " + err.message);
     } finally {
       setActionLoading(false);
     }
@@ -401,7 +401,7 @@ const MarketPools: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      alert("Ocorreu um erro: " + err.message);
+      alert("An error occurred: " + err.message);
     } finally {
       setActionLoading(false);
     }
@@ -414,7 +414,7 @@ const MarketPools: React.FC = () => {
 
     const shareInfo = userShares.find(s => s.tokenPair === selectedPool.tokenPair);
     if (!shareInfo || parseFloat(shareInfo.shares) <= 0) {
-      return alert("Você não possui participação nesta pool.");
+      return alert("You don't have any share in this pool.");
     }
 
     const userTotalShares = parseFloat(shareInfo.shares);
@@ -445,7 +445,7 @@ const MarketPools: React.FC = () => {
       }
     } catch (err: any) {
       console.error(err);
-      alert("Ocorreu um erro: " + err.message);
+      alert("An error occurred: " + err.message);
     } finally {
       setActionLoading(false);
     }

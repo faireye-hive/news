@@ -13,8 +13,8 @@ const HiddenUsers: React.FC = () => {
           <EyeOff size={24} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Usuários Ocultos</h1>
-          <p className="text-slate-400">Gerencie os usuários cujos comentários você escolheu não ver.</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Hidden Users</h1>
+          <p className="text-slate-400">Manage users whose comments you have chosen not to see.</p>
         </div>
       </div>
 
@@ -22,9 +22,9 @@ const HiddenUsers: React.FC = () => {
         {hiddenUsers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
             <UserMinus size={48} className="text-slate-600 mb-4" />
-            <h3 className="text-xl font-bold text-white mb-2">Nenhum usuário oculto</h3>
+            <h3 className="text-xl font-bold text-white mb-2">No hidden users</h3>
             <p className="text-slate-400 max-w-md">
-              Você ainda não ocultou os comentários de nenhum usuário.
+              You have not hidden comments from any users yet.
             </p>
           </div>
         ) : (

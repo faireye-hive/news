@@ -50,6 +50,7 @@ import {
 } from "./contexts/LanguageContext";
 
 import Chat from "./components/Chat";
+import { getAuthorAvatarUrl } from "./utils/lightAccount";
 
 const ThemeToggle: React.FC = () => {
   const [theme, setTheme] = useState<"dark" | "light">(() => {
@@ -167,9 +168,9 @@ const LoginButton: React.FC = () => {
           className="flex items-center gap-2 bg-slate-800 py-1.5 px-3 rounded-full border border-slate-700 hover:border-cent transition-all"
         >
           <img
-            src={`https://images.hive.blog/u/${user}/avatar`}
+            src={getAuthorAvatarUrl(user, lightAccount?.nickname)}
             alt={user}
-            className="w-6 h-6 rounded-full border border-green-500"
+            className="w-6 h-6 rounded-full border border-green-500 object-cover"
           />
           <span className="text-sm font-bold text-white hidden sm:inline">
             {lightAccount ? lightAccount.nickname : user}

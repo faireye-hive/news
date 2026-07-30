@@ -47,6 +47,7 @@ import {
   Users, 
   UserMinus2, 
   History,
+  Settings as SettingsIcon,
   Award,
   BookOpen,
   CheckCircle2,
@@ -62,6 +63,8 @@ import { sanitizeUrl } from '../utils/security';
 import { extractImage } from '../utils/image';
 import { VotersModal } from './VotersModal';
 import VoteModal from './VoteModal';
+import { LightProfileSettingsModal } from './LightProfileSettingsModal';
+import { fetchLightAccountProfileFromHive, getLightAccountProfileLocal, LightAccountProfile } from '../utils/lightAccount';
 
 const getReputation = (rep?: string | number) => {
   if (rep === undefined || rep === null) return '25';
@@ -123,6 +126,28 @@ const Profile: React.FC = () => {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyOffset, setHistoryOffset] = useState(0);
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
+
+  // Light Account Custom Profile State
+  const [lightProfileData, setLightProfileData] = useState<LightAccountProfile | null>(null);
+  const [showEditLightModal, setShowEditLightModal] = useState(false);
+
+  useEffect(() => {
+    if (!displayNickname || !currentProfile) {
+      setLightProfileData(null);
+      return;
+    }
+
+    const localProf = getLightAccountProfileLocal(displayNickname);
+    if (localProf) {
+      setLightProfileData(localProf);
+    }
+
+    fetchLightAccountProfileFromHive(currentProfile, displayNickname).then((prof) => {
+      if (prof) {
+        setLightProfileData(prof);
+      }
+    });
+  }, [currentProfile, displayNickname]);
 
   useEffect(() => {
     if (!currentProfile) return;
@@ -474,20 +499,27 @@ const Profile: React.FC = () => {
     }
   }
 
-  const displayName = displayNickname || profileMetadata.name || currentProfile;
-  const bio = profileMetadata.about || `Fazendo curadoria e publicando as melhores notícias e artigos na comunidade ${community.toUpperCase()}.`;
-  const locationText = profileMetadata.location || `NEWS Holder`;
-  const website = profileMetadata.website || '';
+  let displayName = displayNickname || profileMetadata.name || currentProfile;
+  let bio = profileMetadata.about || `Fazendo curadoria e publicando as melhores notícias e artigos na comunidade ${community.toUpperCase()}.`;
+  let locationText = profileMetadata.location || `NEWS Holder`;
+  let website = profileMetadata.website || '';
   
-  const rawProfileImage = profileMetadata.profile_image || '';
-  const profileImage = rawProfileImage
+  let rawProfileImage = profileMetadata.profile_image || '';
+  let profileImage = rawProfileImage
     ? (rawProfileImage.startsWith('https://images.hive.blog/') ? rawProfileImage : `https://images.hive.blog/256x256/${rawProfileImage}`)
     : `https://images.hive.blog/u/${currentProfile}/avatar/large`;
 
-  const rawCoverImage = profileMetadata.cover_image || '';
-  const coverImage = rawCoverImage
+  let rawCoverImage = profileMetadata.cover_image || '';
+  let coverImage = rawCoverImage
     ? (rawCoverImage.startsWith('https://images.hive.blog/') ? rawCoverImage : `https://images.hive.blog/1280x0/${rawCoverImage}`)
     : '';
+
+  if (displayNickname && lightProfileData) {
+    if (lightProfileData.name && lightProfileData.name.trim()) displayName = lightProfileData.name.trim();
+    if (lightProfileData.about && lightProfileData.about.trim()) bio = lightProfileData.about.trim();
+    if (lightProfileData.profile_image && lightProfileData.profile_image.trim()) profileImage = lightProfileData.profile_image.trim();
+    if (lightProfileData.cover_image && lightProfileData.cover_image.trim()) coverImage = lightProfileData.cover_image.trim();
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fade-in pb-24">
@@ -607,8 +639,21 @@ const Profile: React.FC = () => {
               </div>
             </div>
 
+            {/* Edit Light Account Profile button */}
+            {lightAccount && (isViewingOwnLightAccount || displayNickname === lightAccount.nickname) && (
+              <div className="relative z-10 flex flex-row md:flex-col gap-2.5 w-full md:w-auto shrink-0 mt-2 md:mt-0">
+                <button
+                  onClick={() => setShowEditLightModal(true)}
+                  className="flex-1 md:w-auto flex items-center justify-center gap-2 px-4 py-2.5 font-bold rounded-xl transition-all text-xs border bg-slate-800 text-white border-slate-700/80 hover:bg-slate-700 hover:border-hive/50 shadow-lg"
+                >
+                  <SettingsIcon size={14} className="text-hive" />
+                  {t('lightProfile.editBtn')}
+                </button>
+              </div>
+            )}
+
             {/* Follow/Unfollow & Mute buttons */}
-            {user && user !== currentProfile && (
+            {user && user !== currentProfile && !lightAccount && (
               <div className="relative z-10 flex flex-row md:flex-col gap-2.5 w-full md:w-auto shrink-0 mt-2 md:mt-0">
                 <button 
                   onClick={handleFollow}
@@ -789,7 +834,7 @@ const Profile: React.FC = () => {
                                    type="text" 
                                    value={walletActionTo} 
                                    onChange={(e) => setWalletActionTo(e.target.value.toLowerCase())}
-                                   placeholder="Nome do usuário"
+                                   placeholder="Username"
                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-hive transition-colors font-semibold"
                                 />
                              </div>
@@ -840,7 +885,7 @@ const Profile: React.FC = () => {
                  {/* Account History Logs */}
                  <div className="mt-8">
                     <h3 className="text-base font-black text-white mb-4 flex items-center gap-2 uppercase tracking-wide">
-                       <History size={18} className="text-hive" /> Histórico da Conta
+                       <History size={18} className="text-hive" /> Account History
                     </h3>
                     <div className="bg-slate-900/40 border border-slate-800/40 rounded-2xl overflow-hidden shadow-sm">
                        {accountHistory.length === 0 && !historyLoading ? (
@@ -1270,6 +1315,11 @@ const Profile: React.FC = () => {
          username={user || ''}
          token={community}
          onVote={handleConfirmVote}
+      />
+      <LightProfileSettingsModal
+         isOpen={showEditLightModal}
+         onClose={() => setShowEditLightModal(false)}
+         onSaved={(prof) => setLightProfileData(prof)}
       />
     </div>
   );

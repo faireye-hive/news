@@ -43,19 +43,19 @@ const generateMasterPassword = (): string => {
 // Helper to validate Hive username format
 const validateHiveUsername = (name: string): string | null => {
   if (!name) return null;
-  if (name.length < 3) return 'O nome de usuário deve ter pelo menos 3 caracteres.';
-  if (name.length > 16) return 'O nome de usuário não pode ter mais de 16 caracteres.';
+  if (name.length < 3) return 'Username must be at least 3 characters.';
+  if (name.length > 16) return 'Username cannot be longer than 16 characters.';
   
   const badCharMatch = name.match(/[^a-z0-9.-]/);
-  if (badCharMatch) return 'Apenas letras minúsculas, números, hífens e pontos são permitidos.';
+  if (badCharMatch) return 'Only lowercase letters, numbers, hyphens, and periods are allowed.';
   
-  if (/^[0-9.-]/.test(name)) return 'O nome deve começar com uma letra.';
-  if (/[-.]$/.test(name)) return 'O nome não pode terminar com ponto ou hífen.';
+  if (/^[0-9.-]/.test(name)) return 'Name must start with a letter.';
+  if (/[-.]$/.test(name)) return 'Name cannot end with a period or hyphen.';
   
   const segments = name.split('.');
   for (const seg of segments) {
-    if (seg.length < 3) return 'Cada segmento separado por ponto deve ter pelo menos 3 caracteres.';
-    if (/^[-0-9]/.test(seg)) return 'Cada segmento deve começar com uma letra.';
+    if (seg.length < 3) return 'Each segment separated by a period must have at least 3 characters.';
+    if (/^[-0-9]/.test(seg)) return 'Each segment must start with a letter.';
   }
   return null;
 };
@@ -65,7 +65,7 @@ export const Register: React.FC = () => {
   const { t, language } = useLanguage();
   const { login, loginLight } = useAuth();
 
-  const [registerMode, setRegisterMode] = useState<'full' | 'light'>('full');
+  const [registerMode, setRegisterMode] = useState<'full' | 'light'>('light');
 
   // Full Account State
   const [username, setUsername] = useState('');
@@ -169,7 +169,7 @@ export const Register: React.FC = () => {
         const accounts = await hiveClient.database.getAccounts([cleanName]);
         if (accounts && accounts.length > 0) {
           setIsUsernameAvailable(false);
-          setUsernameError('Este nome de usuário já está em uso na Hive.');
+          setUsernameError('This username is already taken on Hive.');
         } else {
           setIsUsernameAvailable(true);
           setUsernameError(null);
@@ -332,141 +332,20 @@ INSTRUCTIONS:
   };
 
   const handleCreateAccount = async (e: React.FormEvent) => {
-    if (registerMode === 'light') {
-      return handleCreateLightAccount(e);
-    }
-    e.preventDefault();
-    if (!username || usernameError || !isUsernameAvailable) {
-      alert('Por favor, escolha um nome de usuário válido e disponível.');
-      return;
-    }
-    if (!savedKeysConfirmed) {
-      alert('Por favor, confirme que você salvou o backup das suas chaves.');
-      return;
-    }
-
-    const creator = creatorAccount.trim().toLowerCase();
-    const activeKey = creatorActiveKey.trim();
-
-    if (!creator) {
-      setCreationError('A conta criadora (Creator Account) não foi configurada.');
-      return;
-    }
-    if (!activeKey) {
-      setCreationError('A Chave Ativa da conta criadora é necessária para assinar a transação na Hive.');
-      return;
-    }
-    if (!derivedKeys) {
-      setCreationError('Ocorreu um erro ao derivar as chaves da conta.');
-      return;
-    }
-
-    setLoading(true);
-    setCreationError(null);
-
-    try {
-      const buildAuth = (pubKey: string) => ({
-        weight_threshold: 1,
-        account_auths: [],
-        key_auths: [[pubKey, 1]]
-      });
-
-      const ownerAuth = buildAuth(derivedKeys.ownerPublic);
-      const activeAuth = buildAuth(derivedKeys.activePublic);
-      const postingAuth = buildAuth(derivedKeys.postingPublic);
-
-      // Construct create_claimed_account operation
-      const createClaimedOp: any = [
-        'create_claimed_account',
-        {
-          creator: creator,
-          new_account_name: username.trim().toLowerCase(),
-          owner: ownerAuth,
-          active: activeAuth,
-          posting: postingAuth,
-          memo_key: derivedKeys.memoPublic,
-          json_metadata: JSON.stringify({
-            profile: {
-              name: username,
-              about: 'Conta criada via News Token Explorer',
-            }
-          }),
-          extensions: []
-        }
-      ];
-
-      const pKey = PrivateKey.fromString(activeKey);
-
-      // Broadcast operation to Hive Blockchain
-      await hiveClient.broadcast.sendOperations([createClaimedOp], pKey);
-
-      setCreatedSuccess(true);
-    } catch (err: any) {
-      console.error('Account Creation Error:', err);
-      const errMsg = err.message || err.toString();
-
-      if (errMsg.includes('has_claimed_account') || errMsg.includes('rc_plugin') || errMsg.includes('Insufficient RC')) {
-        setCreationError(`A conta criadora @${creator} não possui Claim Account Tokens suficientes ou Recursos (RC) para criar contas grátis.`);
-      } else if (errMsg.includes('canonical') || errMsg.includes('private key') || errMsg.includes('signature')) {
-        setCreationError('A Chave Ativa do criador informada é inválida ou incorreta.');
-      } else {
-        setCreationError(`Erro ao criar conta na Hive: ${errMsg}`);
-      }
-    } finally {
-      setLoading(false);
-    }
+    return handleCreateLightAccount(e);
   };
 
   const handleAutoLogin = async () => {
     try {
-      if (registerMode === 'light') {
-        await loginLight(lightPrivateKey);
-      } else {
-        await login(username.trim().toLowerCase());
-      }
+      await loginLight(lightPrivateKey);
       navigate('/explorer');
     } catch (err: any) {
-      alert('Não foi possível fazer login automático. Erro: ' + err.message);
+      alert('Auto-login failed. Error: ' + err.message);
       navigate('/explorer');
     }
   };
 
   if (createdSuccess) {
-    if (registerMode === 'light') {
-      return (
-        <div className="max-w-2xl mx-auto py-8 px-4 animate-fade-in">
-          <div className="bg-card border border-green-500/30 rounded-2xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
-            <div className="w-16 h-16 bg-green-500/10 text-green-400 rounded-full flex items-center justify-center mx-auto border border-green-500/20">
-              <Sparkles size={36} />
-            </div>
-
-            <div>
-              <h2 className="text-2xl sm:text-3xl font-black text-white">
-                🎉 Light Account Created!
-              </h2>
-              <p className="text-slate-400 mt-2 text-sm">
-                Your nickname <span className="text-cent font-bold font-mono">{nickname}</span> is now linked to <span className="text-cent font-bold font-mono">@{assignedGuestAccount}</span>.
-              </p>
-            </div>
-
-            <div className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 text-left text-xs text-slate-300 space-y-2 font-mono">
-              <div><span className="text-slate-500">Nickname:</span> {nickname}</div>
-              <div><span className="text-slate-500">Light Private Key:</span> <br/><span className="break-all">{lightPrivateKey}</span></div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-              <button
-                onClick={handleAutoLogin}
-                className="flex items-center justify-center gap-2 bg-cent hover:bg-green-400 text-slate-900 font-bold py-3 px-6 rounded-xl transition-all text-sm shadow-lg shadow-cent/20"
-              >
-                <CheckCircle2 size={18} /> Entrar na Conta Light
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div className="max-w-2xl mx-auto py-8 px-4 animate-fade-in">
         <div className="bg-card border border-green-500/30 rounded-2xl p-6 sm:p-8 shadow-2xl text-center space-y-6">
@@ -476,32 +355,24 @@ INSTRUCTIONS:
 
           <div>
             <h2 className="text-2xl sm:text-3xl font-black text-white">
-              🎉 Conta Criada com Sucesso!
+              🎉 Light Account Created!
             </h2>
             <p className="text-slate-400 mt-2 text-sm">
-              Sua nova conta <span className="text-cent font-bold font-mono">@{username}</span> foi registrada na Hive Blockchain.
+              Your nickname <span className="text-cent font-bold font-mono">{nickname}</span> is now linked to <span className="text-cent font-bold font-mono">@{assignedGuestAccount}</span>.
             </p>
           </div>
 
           <div className="p-4 bg-slate-900/80 rounded-xl border border-slate-800 text-left text-xs text-slate-300 space-y-2 font-mono">
-            <div><span className="text-slate-500">Usuário:</span> @{username}</div>
-            <div><span className="text-slate-500">Senha Máster:</span> {masterPassword}</div>
-            <div><span className="text-slate-500">Posting Key:</span> {derivedKeys?.postingPrivate}</div>
+            <div><span className="text-slate-500">Nickname:</span> {nickname}</div>
+            <div><span className="text-slate-500">Light Private Key:</span> <br/><span className="break-all">{lightPrivateKey}</span></div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
             <button
-              onClick={handleDownloadBackup}
-              className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-bold py-3 px-6 rounded-xl border border-slate-700 transition-all text-sm"
-            >
-              <Download size={18} /> Baixar Backup das Chaves
-            </button>
-
-            <button
               onClick={handleAutoLogin}
               className="flex items-center justify-center gap-2 bg-cent hover:bg-green-400 text-slate-900 font-bold py-3 px-6 rounded-xl transition-all text-sm shadow-lg shadow-cent/20"
             >
-              <CheckCircle2 size={18} /> Entrar na Conta
+              <CheckCircle2 size={18} /> Login to Light Account
             </button>
           </div>
         </div>
@@ -529,28 +400,11 @@ INSTRUCTIONS:
       <div className="bg-card border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl space-y-8">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-white flex items-center gap-3">
-            <UserPlus className="text-cent" /> Criar Conta na Hive Blockchain
+            <UserPlus className="text-cent" /> Create Light Account
           </h1>
           <p className="text-slate-400 text-sm mt-2 leading-relaxed">
-            Crie sua conta única e descentralizada na blockchain Hive. Sua conta dá acesso a todo o ecossistema Web3.
+            Create your free guest profile on the Hive blockchain to start participating immediately without needing funds or complex key setups.
           </p>
-        </div>
-
-        <div className="flex bg-slate-900 rounded-lg p-1">
-          <button 
-            type="button"
-            onClick={() => setRegisterMode('full')}
-            className={`flex-1 py-3 px-3 rounded-md text-sm font-bold transition-colors ${registerMode === 'full' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
-          >
-            Full Account (Recommended)
-          </button>
-          <button 
-            type="button"
-            onClick={() => setRegisterMode('light')}
-            className={`flex-1 py-3 px-3 rounded-md text-sm font-bold transition-colors ${registerMode === 'light' ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
-          >
-            Light Account (Guest)
-          </button>
         </div>
 
         {creationError && (
@@ -561,261 +415,60 @@ INSTRUCTIONS:
         )}
 
         <form onSubmit={handleCreateAccount} className="space-y-6">
-          {registerMode === 'full' ? (
-            <>
-              {/* Step 1: Username selection */}
-              <div className="space-y-2">
-                <label className="block text-sm font-bold text-white uppercase tracking-wider">
-                  1. Escolha o Nome de Usuário (@username)
+          <div className="space-y-6">
+            <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-4">
+              <p className="text-sm text-slate-300">
+                Light Accounts are guest profiles that share a master Hive account. You don't need funds to create one.
+              </p>
+              <div>
+                <label className="block text-slate-400 text-xs uppercase mb-1 font-bold">
+                  Guest Account
                 </label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-3.5 text-slate-500 font-bold">@</span>
-                  <input
-                    type="text"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value.toLowerCase().trim())}
-                    placeholder="ex: novousuario"
-                    className={`w-full bg-slate-900 border ${
-                      usernameError 
-                        ? 'border-red-500 focus:border-red-500' 
-                        : isUsernameAvailable === true 
-                        ? 'border-green-500 focus:border-green-500' 
-                        : 'border-slate-700 focus:border-cent'
-                    } rounded-xl py-3 pl-8 pr-10 text-white placeholder-slate-600 outline-none font-mono text-sm transition-all`}
-                    required
-                  />
-
-                  <div className="absolute right-3 top-3.5">
-                    {isCheckingUsername && (
-                      <RefreshCw size={18} className="animate-spin text-slate-400" />
-                    )}
-                    {!isCheckingUsername && isUsernameAvailable === true && (
-                      <CheckCircle2 size={18} className="text-green-400" />
-                    )}
-                    {!isCheckingUsername && isUsernameAvailable === false && (
-                      <XCircle size={18} className="text-red-400" />
-                    )}
-                  </div>
-                </div>
-
-                {usernameError ? (
-                  <p className="text-red-400 text-xs font-medium">{usernameError}</p>
-                ) : isUsernameAvailable === true ? (
-                  <p className="text-green-400 text-xs font-medium">Nome de usuário disponível!</p>
-                ) : (
-                  <p className="text-slate-500 text-xs">
-                    Apenas minúsculas, números e hífens. De 3 a 16 caracteres.
-                  </p>
-                )}
+                <input
+                  type="text"
+                  value={guestAccounts.join(', ') || 'Not configured in .env'}
+                  disabled
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-500 outline-none font-medium text-xs"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-bold text-white uppercase tracking-wider mb-2">
+                  Choose your Nickname
+                </label>
+                <input
+                  type="text"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  placeholder="e.g. John Doe"
+                  className="w-full bg-slate-900 border border-slate-700 focus:border-cent rounded-xl py-3 px-4 text-white placeholder-slate-600 outline-none font-medium text-sm transition-all"
+                  required
+                />
               </div>
 
-              {/* Step 2: Keys & Password Display */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                    <Key size={16} className="text-cent" /> 2. Senha e Chaves de Acesso
-                  </label>
-
-                  <button
-                    type="button"
-                    onClick={handleGenerateNewPassword}
-                    className="text-xs text-slate-400 hover:text-white flex items-center gap-1 transition-colors"
-                  >
-                    <RefreshCw size={12} /> Gerar Nova Senha
-                  </button>
+              <div className="pt-4 border-t border-slate-800">
+                <span className="text-xs text-slate-400 font-semibold block uppercase mb-1">
+                  Your Light Private Key (Save this!)
+                </span>
+                <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs text-amber-300 select-all break-all flex items-center justify-between gap-2">
+                  <span>{lightPrivateKey}</span>
+                  <Lock size={14} className="text-slate-500 shrink-0" />
                 </div>
-
-                <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-4">
-                  <div>
-                    <span className="text-xs text-slate-400 font-semibold block uppercase mb-1">
-                      Senha Máster (Master Password):
-                    </span>
-                    <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs text-amber-300 select-all break-all flex items-center justify-between gap-2">
-                      <span>{masterPassword || 'Gerando...'}</span>
-                      <Lock size={14} className="text-slate-500 shrink-0" />
-                    </div>
-                  </div>
-
-                  {derivedKeys && (
-                    <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                      <div className="text-xs text-slate-400 font-semibold uppercase">Chaves Privadas Derivadas:</div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] font-mono">
-                        <div className="bg-slate-950 p-2.5 rounded border border-slate-800/60">
-                          <span className="text-slate-500 block">Posting Key (Login em apps):</span>
-                          <span className="text-slate-300 break-all select-all">{derivedKeys.postingPrivate}</span>
-                        </div>
-                        <div className="bg-slate-950 p-2.5 rounded border border-slate-800/60">
-                          <span className="text-slate-500 block">Active Key (Carteira/Transações):</span>
-                          <span className="text-slate-300 break-all select-all">{derivedKeys.activePrivate}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Action buttons for keys */}
-                  <div className="flex flex-wrap gap-2 pt-2">
-                    <button
-                      type="button"
-                      onClick={handleCopyKeys}
-                      disabled={!derivedKeys}
-                      className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2 px-3.5 rounded-lg border border-slate-700 transition-all disabled:opacity-50"
-                    >
-                      {copied ? <Check size={14} className="text-green-400" /> : <Copy size={14} />}
-                      {copied ? 'Copiado para Área de Transferência!' : 'Copiar Todas as Chaves'}
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleDownloadBackup}
-                      disabled={!derivedKeys}
-                      className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2 px-3.5 rounded-lg border border-slate-700 transition-all disabled:opacity-50"
-                    >
-                      <Download size={14} /> Baixar Arquivo de Backup (.txt)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Mandatory confirmation checkbox */}
-                <label className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl cursor-pointer hover:bg-amber-500/15 transition-all">
-                  <input
-                    type="checkbox"
-                    checked={savedKeysConfirmed}
-                onChange={(e) => setSavedKeysConfirmed(e.target.checked)}
-                className="mt-1 rounded bg-slate-900 border-amber-500 text-cent focus:ring-0"
-              />
-              <span className="text-xs text-amber-200 leading-relaxed font-medium">
-                <strong className="text-amber-400">Aviso Crítico de Segurança:</strong> Eu salvei e fiz backup da minha Senha Máster e Chaves em um local seguro. Entendo que na Web3 não existe opção de "Esqueci minha senha" e a perda das chaves é irreversível.
-              </span>
-            </label>
-          </div>
-
-          {/* Step 3: Account Creator Info / ENV status */}
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-bold text-white uppercase tracking-wider">
-                3. Configuração do Criador (Creator Account)
+              </div>
+              
+              <label className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl cursor-pointer hover:bg-amber-500/15 transition-all">
+                <input
+                  type="checkbox"
+                  checked={savedKeysConfirmed}
+                  onChange={(e) => setSavedKeysConfirmed(e.target.checked)}
+                  className="mt-1 rounded bg-slate-900 border-amber-500 text-cent focus:ring-0"
+                />
+                <span className="text-xs text-amber-200 leading-relaxed font-medium">
+                  <strong className="text-amber-400">Security Warning:</strong> I have saved my Light Private Key. I will need this to log in.
+                </span>
               </label>
-
-              <button
-                type="button"
-                onClick={() => setShowAdvancedCreator(!showAdvancedCreator)}
-                className="text-xs text-slate-400 hover:text-white transition-colors"
-              >
-                {showAdvancedCreator ? 'Ocultar Opções Avançadas' : 'Opções do Criador'}
-              </button>
             </div>
-
-            {envCreatorAccount ? (
-              <div className="p-3 bg-cent/10 border border-cent/30 rounded-xl text-xs text-slate-300 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Sparkles size={16} className="text-cent" />
-                  <span>
-                    Conta criadora ativa: <strong className="text-white">@{envCreatorAccount}</strong> (via ENV)
-                  </span>
-                </div>
-                <span className="text-[10px] uppercase font-bold text-cent bg-cent/20 px-2 py-0.5 rounded">
-                  Grátis
-                </span>
-              </div>
-            ) : (
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-xl text-xs text-slate-400 flex items-start gap-2">
-                <Info size={16} className="text-slate-400 shrink-0 mt-0.5" />
-                <span>
-                  Nenhuma conta criadora pré-configurada na variável de ambiente (<code>VITE_CREATOR_ACCOUNT</code>). Por favor, informe abaixo o nome da conta e sua chave ativa que possui Claim Account Tokens para registrar esta nova conta.
-                </span>
-              </div>
-            )}
-
-            {showAdvancedCreator && (
-              <div className="p-4 bg-slate-900/50 rounded-xl border border-slate-800 space-y-3 animate-fade-in">
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                    Conta Criadora (@Creator)
-                  </label>
-                  <input
-                    type="text"
-                    value={creatorAccount}
-                    onChange={(e) => setCreatorAccount(e.target.value.toLowerCase().trim())}
-                    placeholder="ex: minerador.hive"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-cent font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
-                    Chave Ativa do Criador (Active Private Key)
-                  </label>
-                  <input
-                    type="password"
-                    value={creatorActiveKey}
-                    onChange={(e) => setCreatorActiveKey(e.target.value.trim())}
-                    placeholder="5K..."
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-white outline-none focus:border-cent font-mono"
-                  />
-                  <p className="text-[10px] text-slate-500 mt-1">
-                    Esta chave é utilizada apenas localmente no navegador para assinar a transação de criação da conta na blockchain.
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
-          </>
-          ) : (
-            <div className="space-y-6">
-              <div className="p-4 bg-slate-900/90 rounded-xl border border-slate-800 space-y-4">
-                <p className="text-sm text-slate-300">
-                  Light Accounts are guest profiles that share a master Hive account. You don't need funds to create one.
-                </p>
-                <div>
-                  <label className="block text-slate-400 text-xs uppercase mb-1 font-bold">
-                    Guest Account
-                  </label>
-                  <input
-                    type="text"
-                    value={guestAccounts.join(', ') || 'Not configured in .env'}
-                    disabled
-                    className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-500 outline-none font-medium text-xs"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-bold text-white uppercase tracking-wider mb-2">
-                    Choose your Nickname
-                  </label>
-                  <input
-                    type="text"
-                    value={nickname}
-                    onChange={(e) => setNickname(e.target.value)}
-                    placeholder="e.g. John Doe"
-                    className="w-full bg-slate-900 border border-slate-700 focus:border-cent rounded-xl py-3 px-4 text-white placeholder-slate-600 outline-none font-medium text-sm transition-all"
-                    required
-                  />
-                </div>
-
-                <div className="pt-4 border-t border-slate-800">
-                  <span className="text-xs text-slate-400 font-semibold block uppercase mb-1">
-                    Your Light Private Key (Save this!)
-                  </span>
-                  <div className="bg-slate-950 p-3 rounded-lg border border-slate-800 font-mono text-xs text-amber-300 select-all break-all flex items-center justify-between gap-2">
-                    <span>{lightPrivateKey}</span>
-                    <Lock size={14} className="text-slate-500 shrink-0" />
-                  </div>
-                </div>
-                
-                <label className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl cursor-pointer hover:bg-amber-500/15 transition-all">
-                  <input
-                    type="checkbox"
-                    checked={savedKeysConfirmed}
-                    onChange={(e) => setSavedKeysConfirmed(e.target.checked)}
-                    className="mt-1 rounded bg-slate-900 border-amber-500 text-cent focus:ring-0"
-                  />
-                  <span className="text-xs text-amber-200 leading-relaxed font-medium">
-                    <strong className="text-amber-400">Security Warning:</strong> I have saved my Light Private Key. I will need this to log in.
-                  </span>
-                </label>
-              </div>
-            </div>
-          )}
 
           {/* Submit Button */}
           <button
@@ -823,18 +476,17 @@ INSTRUCTIONS:
             disabled={
               loading || 
               !savedKeysConfirmed || 
-              (registerMode === 'full' && (!username || !!usernameError || !isUsernameAvailable)) ||
-              (registerMode === 'light' && !nickname)
+              !nickname
             }
             className="w-full bg-cent hover:bg-green-400 text-slate-900 font-black py-4 rounded-xl transition-all disabled:opacity-40 disabled:hover:bg-cent text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-cent/10"
           >
             {loading ? (
               <>
-                <RefreshCw size={18} className="animate-spin" /> Criando Conta na Blockchain...
+                <RefreshCw size={18} className="animate-spin" /> Creating Light Account...
               </>
             ) : (
               <>
-                <UserPlus size={18} /> Criar Minha Conta Hive
+                <UserPlus size={18} /> Create Light Account
               </>
             )}
           </button>

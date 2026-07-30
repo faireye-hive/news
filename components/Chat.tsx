@@ -10,10 +10,11 @@ interface ChatMessage {
   author: string;
   message: string;
   block_num: number;
+  nickname?: string;
 }
 
 const Chat: React.FC = () => {
-  const { user, customJson } = useAuth();
+  const { user, lightAccount, customJson } = useAuth();
   const { t } = useLanguage();
   const { community } = useCommunity();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -36,9 +37,13 @@ const Chat: React.FC = () => {
       
       const parsedMessages: ChatMessage[] = data.map((item: any) => {
         let msgText = '';
+        let nickname = undefined;
         try {
           const parsedJson = JSON.parse(item.json);
           msgText = parsedJson.message || parsedJson.text || '';
+          if (parsedJson.author_nickname) {
+             nickname = parsedJson.author_nickname;
+          }
         } catch (e) {
           msgText = item.json;
         }
@@ -48,7 +53,8 @@ const Chat: React.FC = () => {
           timestamp: item.timestamp,
           author: item.required_posting_auths[0] || item.required_auths[0] || 'Unknown',
           message: msgText,
-          block_num: item.block_num
+          block_num: item.block_num,
+          nickname
         };
       }).filter((m: ChatMessage) => m.message.trim() !== '');
 
@@ -121,9 +127,10 @@ const Chat: React.FC = () => {
         const optimisticMsg: ChatMessage = {
           id: `temp-${Date.now()}`,
           timestamp: new Date().toISOString(),
-          author: user,
+          author: user || '',
           message: inputText.trim(),
-          block_num: 999999999 // placeholder
+          block_num: 999999999,
+          nickname: lightAccount?.nickname
         };
         setMessages(prev => [optimisticMsg, ...prev]);
         setInputText('');
@@ -194,8 +201,10 @@ const Chat: React.FC = () => {
           ) : (
             <>
               {messages.map((msg) => {
-                 const isMe = msg.author === user;
                  const isOptimistic = msg.id.startsWith('temp-');
+                 const isMe = isOptimistic || (lightAccount 
+                   ? (msg.author === user && msg.nickname === lightAccount.nickname)
+                   : (msg.author === user && !msg.nickname));
 
                  if (viewMode === 'microblog') {
                    return (
@@ -207,7 +216,7 @@ const Chat: React.FC = () => {
                         />
                         <div className="flex-1">
                            <div className="flex items-center justify-between mb-1">
-                             <span className="font-bold text-cent">{msg.author}</span>
+                             <span className="font-bold text-cent">{msg.nickname ? `${msg.nickname} (@${msg.author})` : msg.author}</span>
                              <div className="flex items-center gap-2">
                                {isOptimistic && <Loader2 size={12} className="animate-spin text-cent" />}
                                <span className="text-xs text-slate-500">{new Date(msg.timestamp).toLocaleString()}</span>
@@ -229,8 +238,10 @@ const Chat: React.FC = () => {
                             className="w-5 h-5 rounded-full"
                           />
                         )}
-                        <span className={`text-xs font-medium ${isMe ? 'text-cent' : 'text-slate-400'}`}>
-                           {isMe ? t('chat.you') : msg.author}
+                        <span className={`text-xs font-medium ${isMe ? "text-cent" : "text-slate-400"}`}>
+                          {isMe 
+                            ? (lightAccount ? `${t("chat.you")} (${lightAccount.nickname})` : t("chat.you")) 
+                            : (msg.nickname ? `${msg.nickname} (@${msg.author})` : msg.author)}
                         </span>
                         <div className="flex items-center gap-1">
                           {isOptimistic && <Loader2 size={10} className="animate-spin text-cent" />}
