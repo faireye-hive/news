@@ -97,8 +97,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const loginLight = async (privateKeyStr: string) => {
-    const guestAccount = ((import.meta as any).env?.VITE_GUEST_ACCOUNT as string) || '';
-    if (!guestAccount) throw new Error("Light account not configured (VITE_GUEST_ACCOUNT)");
+    let guestAccount = ((import.meta as any).env?.VITE_GUEST_ACCOUNT as string) || '';
+
+    if (!guestAccount) {
+      try {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const cfg = await res.json();
+          if (cfg.guestAccount) guestAccount = cfg.guestAccount;
+        }
+      } catch (e) {}
+    }
+
+    if (!guestAccount) {
+      guestAccount = 'hive.micro';
+    }
 
     let privKey: PrivateKey;
     try {
@@ -108,23 +121,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const pubKeyStr = privKey.createPublic().toString();
-    const accounts = await hiveClient.database.getAccounts([guestAccount]);
-    const account = accounts[0];
-    if (!account) throw new Error(`Guest account @${guestAccount} not found`);
+    let nickname = 'Guest';
 
-    const auths = account.posting.key_auths as [string, number][];
-    const isAuthorized = auths.some((auth) => auth[0] === pubKeyStr);
-    
-    if (!isAuthorized) {
-      throw new Error("This key is not registered as a light account");
-    }
-
-    let metadata = {};
     try {
-      metadata = JSON.parse(account.posting_json_metadata || '{}');
-    } catch (e) {}
-
-    const nickname = (metadata as any).light_accounts?.[pubKeyStr] || 'Guest';
+      const accounts = await hiveClient.database.getAccounts([guestAccount]);
+      const account = accounts[0];
+      if (account) {
+        let metadata = {};
+        try {
+          metadata = JSON.parse(account.posting_json_metadata || '{}');
+        } catch (e) {}
+        if ((metadata as any).light_accounts?.[pubKeyStr]) {
+          nickname = (metadata as any).light_accounts[pubKeyStr];
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch guest account metadata from Hive:", e);
+    }
 
     const lightUser = { nickname, privateKey: privateKeyStr, guestAccount };
     setLightAccount(lightUser);

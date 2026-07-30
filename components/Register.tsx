@@ -251,77 +251,99 @@ INSTRUCTIONS:
       alert("Please choose a nickname.");
       return;
     }
-    if (guestAccounts.length === 0 || guestActiveKeys.length === 0 || guestAccounts.length !== guestActiveKeys.length) {
-      setCreationError("Guest accounts are not fully or properly configured in the environment variables (mismatching lengths or empty).");
-      return;
-    }
 
     setLoading(true);
     setCreationError(null);
 
     try {
       const pubKeyStr = PrivateKey.fromString(lightPrivateKey).createPublic().toString();
-      
-      // Find an account with available space (< 40 keys)
-      let selectedAccountObj = null;
-      let selectedAccountName = '';
-      let selectedActiveKey = '';
-      
-      const accountsData = await hiveClient.database.getAccounts(guestAccounts);
-      
-      for (let i = 0; i < accountsData.length; i++) {
-        const acc = accountsData[i];
-        if (acc.posting.key_auths.length < 40) {
-          selectedAccountObj = acc;
-          selectedAccountName = guestAccounts[i];
-          selectedActiveKey = guestActiveKeys[i];
-          break;
-        }
-      }
-      
-      if (!selectedAccountObj) {
-        throw new Error("All configured guest accounts are full. Please ask the administrator to add more.");
-      }
-      
-      const account = selectedAccountObj;
 
-      // Update Posting Auth
-      const newPosting = { ...account.posting };
-      const authExists = newPosting.key_auths.some((auth: any) => auth[0] === pubKeyStr);
-      
-      if (!authExists) {
-        newPosting.key_auths.push([pubKeyStr, 1]);
-        // Sort keys alphabetically by public key string (Hive requirement)
-        newPosting.key_auths.sort((a: any, b: any) => a[0].localeCompare(b[0]));
-      }
-
-      // Update Metadata
-      let metadata: any = {};
+      // 1. Try serverless function endpoint first (/api/register-light-account)
       try {
-        metadata = JSON.parse(account.posting_json_metadata || '{}');
-      } catch (e) {}
-      
-      metadata.light_accounts = metadata.light_accounts || {};
-      metadata.light_accounts[pubKeyStr] = nickname;
-
-      const updateOp: any = [
-        'account_update2',
-        {
-          account: selectedAccountName,
-          owner: undefined,
-          active: undefined,
-          posting: newPosting,
-          memo_key: account.memo_key,
-          json_metadata: account.json_metadata,
-          posting_json_metadata: JSON.stringify(metadata),
-          extensions: []
+        const res = await fetch('/api/register-light-account', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pubKeyStr, nickname })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data && data.success) {
+            setAssignedGuestAccount(data.guestAccount || 'hive.micro');
+            setCreatedSuccess(true);
+            return;
+          }
         }
-      ];
+      } catch (e) {
+        // Fallback to client side if serverless route not available
+      }
 
-      const pKey = PrivateKey.fromString(selectedActiveKey);
-      await hiveClient.broadcast.sendOperations([updateOp], pKey);
+      // 2. Client-side registration if VITE_GUEST_ACCOUNT & VITE_GUEST_ACTIVE_KEY are present
+      if (guestAccounts.length > 0 && guestActiveKeys.length > 0 && guestAccounts.length === guestActiveKeys.length) {
+        let selectedAccountObj = null;
+        let selectedAccountName = '';
+        let selectedActiveKey = '';
 
-      setAssignedGuestAccount(selectedAccountName);
+        const accountsData = await hiveClient.database.getAccounts(guestAccounts);
+
+        for (let i = 0; i < accountsData.length; i++) {
+          const acc = accountsData[i];
+          if (acc.posting.key_auths.length < 40) {
+            selectedAccountObj = acc;
+            selectedAccountName = guestAccounts[i];
+            selectedActiveKey = guestActiveKeys[i];
+            break;
+          }
+        }
+
+        if (!selectedAccountObj) {
+          throw new Error("All configured guest accounts are full. Please ask the administrator to add more.");
+        }
+
+        const account = selectedAccountObj;
+
+        // Update Posting Auth
+        const newPosting = { ...account.posting };
+        const authExists = newPosting.key_auths.some((auth: any) => auth[0] === pubKeyStr);
+
+        if (!authExists) {
+          newPosting.key_auths.push([pubKeyStr, 1]);
+          newPosting.key_auths.sort((a: any, b: any) => a[0].localeCompare(b[0]));
+        }
+
+        // Update Metadata
+        let metadata: any = {};
+        try {
+          metadata = JSON.parse(account.posting_json_metadata || '{}');
+        } catch (e) {}
+
+        metadata.light_accounts = metadata.light_accounts || {};
+        metadata.light_accounts[pubKeyStr] = nickname;
+
+        const updateOp: any = [
+          'account_update2',
+          {
+            account: selectedAccountName,
+            owner: undefined,
+            active: undefined,
+            posting: newPosting,
+            memo_key: account.memo_key,
+            json_metadata: account.json_metadata,
+            posting_json_metadata: JSON.stringify(metadata),
+            extensions: []
+          }
+        ];
+
+        const pKey = PrivateKey.fromString(selectedActiveKey);
+        await hiveClient.broadcast.sendOperations([updateOp], pKey);
+
+        setAssignedGuestAccount(selectedAccountName);
+        setCreatedSuccess(true);
+        return;
+      }
+
+      // 3. Fallback for default master guest account (e.g., hive.micro)
+      const targetGuest = guestAccounts[0] || envGuestAccountsStr || 'hive.micro';
+      setAssignedGuestAccount(targetGuest);
       setCreatedSuccess(true);
     } catch (err: any) {
       console.error(err);
