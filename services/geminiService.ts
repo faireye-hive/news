@@ -1,18 +1,35 @@
 import { MarketMetrics, Token } from '../types';
 
-// Verifica se a API key está disponível em tempo de execução
-const GEMINI_API_KEY: string | undefined =
-  (typeof process !== 'undefined' && process.env?.API_KEY) || undefined;
-
-export const isGeminiAvailable = (): boolean => !!GEMINI_API_KEY;
+export const isGeminiAvailable = (): boolean => true;
 
 export const analyzeTokenData = async (token: Token, metrics: MarketMetrics): Promise<string> => {
+  // 1. First try serverless function (/api/gemini)
+  try {
+    const res = await fetch('/api/gemini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, metrics }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.text) {
+        return data.text;
+      }
+    }
+  } catch (e) {
+    // Serverless endpoint not available or network error, fallback to client
+  }
+
+  // 2. Client-side fallback if key exists in process.env
+  const GEMINI_API_KEY: string | undefined =
+    (typeof process !== 'undefined' && process.env?.API_KEY) || undefined;
+
   if (!GEMINI_API_KEY) {
-    return '';
+    return 'Analista IA indisponível. Configure a variável GEMINI_API_KEY no painel do Cloudflare Pages.';
   }
 
   try {
-    // Import dinâmico para não bloquear o bundle quando a key não existe
     const { GoogleGenAI } = await import('@google/genai');
     const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
@@ -39,6 +56,6 @@ export const analyzeTokenData = async (token: Token, metrics: MarketMetrics): Pr
     return response.text || 'Não foi possível gerar a análise no momento.';
   } catch (error) {
     console.error('Gemini Analysis Error:', error);
-    return 'Erro ao conectar com o analista IA. Verifique sua chave API.';
+    return 'Erro ao conectar com o analista IA.';
   }
 };

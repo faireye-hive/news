@@ -200,19 +200,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     if (lightAccount) {
-      try {
-        const guestPostingKey = ((import.meta as any).env?.VITE_GUEST_POSTING_KEY as string) || '';
-        if (!guestPostingKey) throw new Error("Master posting key not configured");
-        
-        const privKey = PrivateKey.fromString(lightAccount.privateKey);
-        const masterKey = PrivateKey.fromString(guestPostingKey);
-
-        await hiveClient.broadcast.sendOperations(operations, [privKey, masterKey]);
-        return { success: true, msg: 'Commented successfully' };
-      } catch (err: any) {
-        console.error(err);
-        return { success: false, msg: err.message };
-      }
+      return broadcastLightOperations(operations);
     }
 
     return new Promise((resolve) => {
@@ -232,6 +220,49 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     });
   };
 
+  const broadcastLightOperations = async (operations: any[]): Promise<KeychainResponse> => {
+    if (!lightAccount) return { success: false, msg: 'No light account logged in' };
+
+    // 1. Try serverless function (/api/light-broadcast) so master posting key stays on Cloudflare Functions server
+    try {
+      const response = await fetch('/api/light-broadcast', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operations,
+          lightPrivateKey: lightAccount.privateKey,
+          guestAccount: lightAccount.guestAccount
+        })
+      });
+
+      if (response.ok) {
+        const json = await response.json();
+        if (json.success) {
+          return { success: true, msg: json.msg || 'Broadcasted via Cloudflare Serverless Function' };
+        }
+      }
+    } catch (e) {
+      // Endpoint not found or network error, fallback to client side
+    }
+
+    // 2. Client-side fallback if VITE_GUEST_POSTING_KEY is provided in client bundle
+    try {
+      const guestPostingKey = ((import.meta as any).env?.VITE_GUEST_POSTING_KEY as string) || '';
+      if (!guestPostingKey) {
+        throw new Error("Master posting key not configured. Set GUEST_POSTING_KEY in Cloudflare Pages environment variables.");
+      }
+
+      const privKey = PrivateKey.fromString(lightAccount.privateKey);
+      const masterKey = PrivateKey.fromString(guestPostingKey);
+
+      await hiveClient.broadcast.sendOperations(operations, [privKey, masterKey]);
+      return { success: true, msg: 'Operation broadcasted successfully' };
+    } catch (err: any) {
+      console.error(err);
+      return { success: false, msg: err.message };
+    }
+  };
+
   const customJson = async (id: string, json: any, display_name: string, keyType: 'Posting' | 'Active' = 'Posting'): Promise<KeychainResponse> => {
     if (lightAccount) {
       if (id === 'follow' || (Array.isArray(json) && json[0] === 'follow') || (typeof json === 'object' && json?.id === 'follow')) {
@@ -240,29 +271,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       if (keyType === 'Active') {
         return { success: false, msg: "Light accounts cannot perform Active key operations" };
       }
-      try {
-        const guestPostingKey = ((import.meta as any).env?.VITE_GUEST_POSTING_KEY as string) || '';
-        if (!guestPostingKey) throw new Error("Master posting key not configured");
-        
-        const privKey = PrivateKey.fromString(lightAccount.privateKey);
-        const masterKey = PrivateKey.fromString(guestPostingKey);
-        
-        // Append nickname context if it's a social action (like follow)
-        const enrichedJson = { ...json, author_nickname: lightAccount.nickname };
+      const enrichedJson = { ...json, author_nickname: lightAccount.nickname };
 
-        const op: any[] = ['custom_json', {
-          required_auths: [],
-          required_posting_auths: [lightAccount.guestAccount],
-          id,
-          json: JSON.stringify(enrichedJson)
-        }];
+      const op: any[] = ['custom_json', {
+        required_auths: [],
+        required_posting_auths: [lightAccount.guestAccount],
+        id,
+        json: JSON.stringify(enrichedJson)
+      }];
 
-        await hiveClient.broadcast.sendOperations([op], [privKey, masterKey]);
-        return { success: true, msg: 'Custom JSON broadcasted' };
-      } catch (err: any) {
-        console.error(err);
-        return { success: false, msg: err.message };
-      }
+      return broadcastLightOperations([op]);
     }
 
     return new Promise((resolve) => {
