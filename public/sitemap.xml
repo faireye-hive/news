@@ -26,6 +26,24 @@
     <priority>1.0</priority>
   </url>
   <url>
+    <loc>https://news.faireye.workers.dev/@accountcreatorx/u-5a9a420648-test-1785435812787</loc>
+    <lastmod>2026-07-30T18:23:36.000Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://news.faireye.workers.dev/@sappola/actifit-sappola-20260730t181501502z</loc>
+    <lastmod>2026-07-30T18:15:09.000Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://news.faireye.workers.dev/@ninjamike/season-186-report-and-won-an-aurendrak</loc>
+    <lastmod>2026-07-30T18:14:03.000Z</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://news.faireye.workers.dev/@bala41288/things-will-not-be-better</loc>
     <lastmod>2026-07-30T17:12:45.000Z</lastmod>
     <changefreq>monthly</changefreq>
@@ -260,13 +278,13 @@
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://news.faireye.workers.dev/@silvertop/actifit-silvertop-20260730t040614556z</loc>
+    <loc>https://news.faireye.workers.dev/@elizabethbit/actifit-elizabethbit-20260730t040613371z</loc>
     <lastmod>2026-07-30T04:06:18.000Z</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://news.faireye.workers.dev/@elizabethbit/actifit-elizabethbit-20260730t040613371z</loc>
+    <loc>https://news.faireye.workers.dev/@silvertop/actifit-silvertop-20260730t040614556z</loc>
     <lastmod>2026-07-30T04:06:18.000Z</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>

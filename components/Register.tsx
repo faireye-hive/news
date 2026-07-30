@@ -108,7 +108,6 @@ export const Register: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [creationError, setCreationError] = useState<string | null>(null);
   const [createdSuccess, setCreatedSuccess] = useState(false);
-  const [assignedGuestAccount, setAssignedGuestAccount] = useState('');
 
   // Generate initial master password on mount
   useEffect(() => {
@@ -271,10 +270,6 @@ INSTRUCTIONS:
         throw new Error(jsonResponse.error || "Failed to register light account on server.");
       }
       
-      // Fallback if VITE_GUEST_ACCOUNT is a list
-      const guestAcc = guestAccounts[0] || 'cent-light'; // Ensure this matches the server's HIVE_MAIN_ACCOUNT
-
-      setAssignedGuestAccount(guestAcc);
       setCreatedSuccess(true);
     } catch (err: any) {
       console.error(err);
@@ -311,7 +306,7 @@ INSTRUCTIONS:
               🎉 Light Account Created!
             </h2>
             <p className="text-slate-400 mt-2 text-sm">
-              Your nickname <span className="text-cent font-bold font-mono">{nickname}</span> is now linked to <span className="text-cent font-bold font-mono">@{assignedGuestAccount}</span>.
+              Your nickname <span className="text-cent font-bold font-mono">{nickname}</span> is now registered!
             </p>
           </div>
 
@@ -373,17 +368,6 @@ INSTRUCTIONS:
               <p className="text-sm text-slate-300">
                 Light Accounts are guest profiles that share a master Hive account. You don't need funds to create one.
               </p>
-              <div>
-                <label className="block text-slate-400 text-xs uppercase mb-1 font-bold">
-                  Guest Account
-                </label>
-                <input
-                  type="text"
-                  value={guestAccounts.join(', ') || 'Not configured in .env'}
-                  disabled
-                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-slate-500 outline-none font-medium text-xs"
-                />
-              </div>
               
               <div>
                 <label className="block text-sm font-bold text-white uppercase tracking-wider mb-2">

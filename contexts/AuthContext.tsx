@@ -97,9 +97,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const loginLight = async (privateKeyStr: string) => {
-    const envGuestAccountsStr = ((import.meta as any).env?.VITE_GUEST_ACCOUNT as string) || 'cent-light';
-    const guestAccounts = envGuestAccountsStr.split(',').map((s: string) => s.trim()).filter(Boolean);
-
     let privKey: PrivateKey;
     try {
       privKey = PrivateKey.fromString(privateKeyStr);
@@ -108,32 +105,26 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
 
     const pubKeyStr = privKey.createPublic().toString();
-    const accounts = await hiveClient.database.getAccounts(guestAccounts);
     
-    let authorizedAccount = null;
+    let mainAccount = '';
     let nickname = 'Guest';
 
-    for (const account of accounts) {
-      const auths = account.posting.key_auths as [string, number][];
-      const isAuthorized = auths.some((auth) => auth[0] === pubKeyStr);
-      if (isAuthorized) {
-        authorizedAccount = account;
-        let metadata = {};
-        try {
-          metadata = JSON.parse(account.posting_json_metadata || '{}');
-        } catch (e) {}
-        nickname = (metadata as any).light_accounts?.[pubKeyStr] || 'Guest';
-        break;
+    try {
+      const res = await fetch(`https://hive-light-api.faireye.workers.dev/find-account?pubkey=${pubKeyStr}`);
+      const data = await res.json();
+      if (data.found && data.mainAccount) {
+        mainAccount = data.mainAccount;
+        nickname = data.nickname || 'Guest';
+      } else {
+        throw new Error("This key is not registered as a light account");
       }
+    } catch (err: any) {
+      throw new Error(err.message || "Failed to verify light account");
     }
 
-    if (!authorizedAccount) {
-      throw new Error("This key is not registered as a light account");
-    }
-
-    const lightUser = { nickname, privateKey: privateKeyStr, guestAccount: authorizedAccount.name };
+    const lightUser = { nickname, privateKey: privateKeyStr, guestAccount: mainAccount };
     setLightAccount(lightUser);
-    setUser(authorizedAccount.name);
+    setUser(mainAccount);
     localStorage.setItem('cent_light_user', JSON.stringify(lightUser));
     localStorage.removeItem('cent_user');
   };
